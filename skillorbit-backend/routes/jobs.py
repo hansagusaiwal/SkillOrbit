@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from data import jobs
+from data_jobs import jobs
 from models import Job, JobCreate
 
 router = APIRouter()

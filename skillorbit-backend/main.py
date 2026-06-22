@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import auth, jobs, candidates, shortlist, dashboard
+from routes import auth, jobs, candidates, shortlist, dashboard, rank
 
 app = FastAPI(title="SkillOrbit API", version="1.0.0")
 
@@ -17,6 +17,7 @@ app.include_router(jobs.router, prefix="/api/jobs")
 app.include_router(candidates.router, prefix="/api/candidates")
 app.include_router(shortlist.router, prefix="/api/shortlist")
 app.include_router(dashboard.router, prefix="/api/dashboard")
+app.include_router(rank.router, prefix="/api/candidates")
 
 
 @app.get("/api/health")
@@ -26,5 +27,4 @@ def health():
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("main:app", host="0.0.0.0", port=3001, reload=True)
