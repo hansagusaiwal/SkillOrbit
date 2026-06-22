@@ -1,23 +1,26 @@
 from fastapi import APIRouter
-from data import candidates, jobs
+from data import raw_candidates
+from data_jobs import jobs
 from models import DashboardStats
+from ml.scorer import score_candidate
 
 router = APIRouter()
 
 
 @router.get("/stats", response_model=DashboardStats)
 def dashboard_stats():
-    avg_score = (
-        sum(c.successScore for c in candidates) // len(candidates)
-        if candidates
+    scored = [score_candidate(dict(c)) for c in raw_candidates]
+    avg = (
+        sum(c["successScore"] for c in scored) / len(scored)
+        if scored
         else 0
     )
     return DashboardStats(
         totalCandidatesIndexed=100000,
         activeJobs=sum(1 for j in jobs if j.status == "Active"),
         rankedShortlists=34,
-        avgSuccessScore=avg_score,
-        hiddenGemsFound=sum(1 for c in candidates if c.hiddenGem),
+        avgSuccessScore=round(avg, 1),
+        hiddenGemsFound=sum(1 for c in raw_candidates if c.get("hiddenGem")),
     )
 
 
