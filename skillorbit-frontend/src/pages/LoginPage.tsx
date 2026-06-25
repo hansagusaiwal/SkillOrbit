@@ -1,21 +1,32 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { login } from "../api";
 
 export default function LoginPage() {
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError("");
+
+    const form = event.currentTarget;
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await login(email, password);
       navigate("/dashboard");
-    }, 900);
+    } catch {
+      setError("Invalid credentials. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -169,6 +180,12 @@ export default function LoginPage() {
                 Access your AI recruitment dashboard.
               </p>
             </div>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-error-container/10 px-4 py-3 text-sm font-medium text-error">
+                {error}
+              </div>
+            )}
 
             <form className="space-y-3.5" onSubmit={handleSubmit}>
               {/* Email Field */}

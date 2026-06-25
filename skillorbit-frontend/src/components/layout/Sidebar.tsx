@@ -9,6 +9,7 @@ import {
   PlusCircle,
   Search,
   UserRound,
+  BarChart3,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 
@@ -21,6 +22,7 @@ const navItems = [
   { label: "Hidden Gems", path: "/hidden-gems", icon: Gem },
   { label: "Talent Twin / Compare", path: "/talent-twin", icon: Network },
   { label: "Shortlist Export", path: "/shortlist-export", icon: FileDown },
+  { label: "Market Insight", path: "/market-insight", icon: BarChart3 },
 ];
 
 export default function Sidebar() {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
-import { explainCandidate } from "../api";
+import { explainCandidate, analyzeBehavioralSignals } from "../api";
 
 const scoreCards = [
   {
@@ -69,11 +69,14 @@ const skills = [
   },
 ];
 
-const behavioralSignals = [
-  { label: "Collaboration", value: 94 },
-  { label: "Problem Solving", value: 88 },
-  { label: "Learning Velocity", value: 96 },
-];
+const BEHAVIORAL_LABELS: Record<string, string> = {
+  collaboration: "Collaboration",
+  problem_solving: "Problem Solving",
+  learning_velocity: "Learning Velocity",
+  ownership: "Ownership",
+  communication: "Communication",
+  initiative: "Initiative",
+};
 
 const defaultCandidateFeatures: Record<string, number> = {
   skills_overlap: 0.92, years_experience: 7.2, company_prestige: 4,
@@ -88,12 +91,17 @@ export default function CandidateProfilePage() {
   const { candidateId } = useParams();
   const [explanation, setExplanation] = useState<Awaited<ReturnType<typeof explainCandidate>> | null>(null);
   const [explainLoading, setExplainLoading] = useState(true);
+  const [behavioral, setBehavioral] = useState<Awaited<ReturnType<typeof analyzeBehavioralSignals>> | null>(null);
 
   useEffect(() => {
     explainCandidate(defaultCandidateFeatures, 5)
       .then(setExplanation)
       .catch(() => setExplanation(null))
       .finally(() => setExplainLoading(false));
+
+    analyzeBehavioralSignals(candidateId ?? "CAND-0000")
+      .then(setBehavioral)
+      .catch(() => setBehavioral(null));
   }, [candidateId]);
 
   return (
@@ -254,9 +262,13 @@ export default function CandidateProfilePage() {
                 </div>
 
                 <div className="flex flex-col gap-4">
-                  {behavioralSignals.map((signal) => (
-                    <BehaviorSignal key={signal.label} {...signal} />
-                  ))}
+                  {behavioral ? (
+                    Object.entries(behavioral.scores).filter(([k]) => k !== "overall").map(([key, value]) => (
+                      <BehaviorSignal key={key} label={BEHAVIORAL_LABELS[key] ?? key} value={Math.round(value)} />
+                    ))
+                  ) : (
+                    <p className="text-sm text-on-surface-variant">Loading behavioral signals...</p>
+                  )}
                 </div>
               </div>
             </div>

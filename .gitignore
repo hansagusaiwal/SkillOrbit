@@ -41,3 +41,25 @@ venv/
 skillorbit-backend/ml/*.pkl
 skillorbit-backend/ml/*.npy
 skillorbit-backend/ml/ranker_data/
+
+# Testing & code quality
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.tox/
+
+# Database
+*.db
+*.sqlite
+instance/
+
+# ML experiment tracking
+mlruns/

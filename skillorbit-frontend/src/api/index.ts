@@ -184,3 +184,126 @@ export function getCopilotExplanation(candidate: Record<string, number>, name: s
     name,
   });
 }
+
+// ── Feature 6: Talent Twin / Benchmarking ───────────────────────────
+
+export function classifyCandidate(candidate: Record<string, number>) {
+  return api.post<{
+    primary_archetype: string;
+    archetype_traits: string;
+    affinity_scores: Record<string, number>;
+  }>("/talent-twin/classify", { candidate });
+}
+
+export function findTalentTwins(candidate: Record<string, number>, topK: number = 5) {
+  return api.post<{
+    twins: {
+      id: string;
+      name: string;
+      twin_similarity: number;
+      archetype: string;
+    }[];
+  }>("/talent-twin/find-twins", { candidate, top_k: topK });
+}
+
+export function benchmarkCandidate(candidate: Record<string, number>) {
+  return api.post<{
+    archetype: string;
+    benchmark_score: number;
+    summary: string;
+    feature_deltas: Record<string, { vs_archetype: number; direction: string }>;
+  }>("/talent-twin/benchmark", { candidate });
+}
+
+export function bestArchetypeForRole(roleSignals: Record<string, number>, topN: number = 3) {
+  return api.post<{
+    results: { archetype: string; fit_score: number; traits: string }[];
+  }>("/talent-twin/best-archetype", { role_signals: roleSignals, top_n: topN });
+}
+
+export function getPoolComposition() {
+  return api.get<{
+    composition: { archetype: string; count: number; pct: number; traits: string }[];
+  }>("/talent-twin/pool-composition");
+}
+
+// ── Feature 7: Behavioral Signals Analysis ─────────────────────────
+
+export function analyzeBehavioralSignals(candidateId: string = "CAND-0000") {
+  return api.post<{
+    candidate_id: string;
+    scores: {
+      collaboration: number;
+      problem_solving: number;
+      learning_velocity: number;
+      ownership: number;
+      communication: number;
+      initiative: number;
+      overall: number;
+    };
+    confidence: number;
+    top_evidence: Record<string, string[]>;
+  }>("/behavioral-signals/analyze", { candidate_id: candidateId });
+}
+
+// ── Feature 8: AI Market Insight ───────────────────────────────────
+
+export function getMarketOptions() {
+  return api.get<{
+    clusters: string[];
+    locations: string[];
+  }>("/market-insight/options");
+}
+
+export function getMarketInsight(skillCluster: string = "ML / AI Engineering", location: string = "San Francisco") {
+  return api.post<{
+    skill_cluster: string;
+    location: string;
+    supply_count: number;
+    demand_count: number;
+    supply_demand_ratio: number;
+    density_label: string;
+    density_score: number;
+    avg_experience_yrs: number;
+    avg_salary_estimate: number;
+    competition_index: number;
+    trend_direction: string;
+    trend_pct_6mo: number;
+    forecast_3mo: number;
+    top_companies_hiring: string[];
+    insight_text: string;
+  }>("/market-insight/insight", { skill_cluster: skillCluster, location });
+}
+
+export function getMarketOpportunities() {
+  return api.get<{
+    results: {
+      skill_cluster: string;
+      location: string;
+      opportunity_score: number;
+      tier: string;
+      density: string;
+      trend: string;
+      competition: number;
+    }[];
+  }>("/market-insight/opportunities");
+}
+
+export function getMarketReport() {
+  return api.get<{
+    rows: {
+      skill_cluster: string;
+      location: string;
+      supply: number;
+      demand: number;
+      ratio: number;
+      density: string;
+      competition_index: number;
+      trend: string;
+      trend_pct_6mo: number;
+      forecast_3mo: number;
+      avg_salary: number;
+      avg_exp_yrs: number;
+    }[];
+  }>("/market-insight/report");
+}

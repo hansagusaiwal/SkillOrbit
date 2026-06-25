@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import AppLayout from "../components/layout/AppLayout";
-import { compareCandidates } from "../api";
+import {
+  compareCandidates, classifyCandidate, findTalentTwins,
+} from "../api";
 
 const aaravFeatures = {
   skills_overlap: 0.95, years_experience: 7.0, company_prestige: 4,
@@ -18,43 +20,25 @@ const priyaFeatures = {
   endorsements_count: 180, career_growth_rate: 0.5, response_time_score: 0.70,
 };
 
-const topMatches = [
-  {
-    name: "Aarav Mehta",
-    role: "Senior ML Engineer @ Scale AI",
-    score: "92%",
-    active: true,
-    badge: "HIRED?",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAE80bNloxG-Ba_AJIa_UEOjC7oVZhrth6AnK2gOtEl5JZJhfhobGHnnFiXIq1zKDtIj1u3Bf2vbKxEzfr0RhZSMDA5uas8p5x_KEr2DeljK82yIZWaaXLdXIHqCWldoMz66MksUst9Lp-lKmemg1bBr2qRRoQHgkQxq4Vii9P-ZfD8c-O23A-ZVuvBap8AUXTqsra2Ngghd5IeRjllAR9_qUm76VfiXhZWwYhkZDLI0gPfJ49MMpzSISI4sxyUMOmBeJtZC9-Cq6ql",
-  },
-  {
-    name: "Sarah Cho",
-    role: "Infrastructure Lead @ Vercel",
-    score: "89%",
-    active: false,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDSr1h3IvZeN2QGTWbK03Lj-7RkrYfQRKvoNVkyU3lElrHuSYCRNTsjzJ9ys-XW8wgwp7vkxZEI8X8V2yWLxXoFB4-rRbREbkNR57-2NFh0K8RXlIoWC3eHEVYVvAddX3Opft-KM4_bFkqB5SkfLGa2AfoSoaCw7qt9vqTczSfCHxWr-b3Ts58_Brj-06qgHvwYM-qPUHXtXOm2Ga-YXq3ZtW0QnddqLmxbA17u1KWHhTFSBR29pUDNJG_XLMmNY22hdIIPFB2x2XLc",
-  },
-  {
-    name: "Marcus Thorne",
-    role: "Staff Engineer @ Uber (ex-Google)",
-    score: "84%",
-    active: false,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBIdaUyqw5bx7ul0C6U9HIh-fVDIDLEWA1ntcT1iTfq1xXRw1iynONsVDdY4RKi0qZzDjJd1d14dX6PiAbz225LVZon_0Hch92bZL0JShhBedfceJhKPbK67kapXNNVd1BvTB10TomM-Exh-imyURoo9yT-3dPj9DQy0bhlbjaXlaUk-MeExiUW2Adqk2DylV6pBCBpmzFEm_rjUKOH__hbTlC194R2dA-q6UHPeEur-JTQfnTY6yt-7ab2-q5PVncRgGu1hi0lKW9X",
-  },
-];
-
 export default function TalentTwinPage() {
   const [comparison, setComparison] = useState<Awaited<ReturnType<typeof compareCandidates>> | null>(null);
   const [compareLoading, setCompareLoading] = useState(true);
+  const [archetype, setArchetype] = useState<Awaited<ReturnType<typeof classifyCandidate>> | null>(null);
+  const [twins, setTwins] = useState<Awaited<ReturnType<typeof findTalentTwins>> | null>(null);
 
   useEffect(() => {
     compareCandidates(aaravFeatures, priyaFeatures, "Aarav Mehta", "Priya Sharma")
       .then(setComparison)
       .catch(() => setComparison(null))
       .finally(() => setCompareLoading(false));
+
+    classifyCandidate(aaravFeatures)
+      .then(setArchetype)
+      .catch(() => setArchetype(null));
+
+    findTalentTwins(aaravFeatures, 5)
+      .then(setTwins)
+      .catch(() => setTwins(null));
   }, []);
 
   return (
@@ -104,66 +88,39 @@ export default function TalentTwinPage() {
                 </div>
 
                 <span className="rounded-full bg-secondary/10 px-2 py-1 text-xs font-bold uppercase text-secondary">
-                  Target Persona
+                  {archetype ? archetype.primary_archetype : "Target Persona"}
                 </span>
               </div>
 
               <div className="space-y-md p-lg">
                 <div className="ai-glow rounded-lg border border-primary/20 bg-surface-container p-4">
                   <h3 className="mb-2 font-label-md text-on-surface">
-                    Role: Senior AI Engineer
+                    Archetype: {archetype?.primary_archetype ?? "Senior AI Engineer"}
                   </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    Extracted from Job Description #882-X. Optimized for Series
-                    B rapid growth.
+                    {archetype?.archetype_traits ?? "Extracted from Job Description #882-X. Optimized for Series B rapid growth."}
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <TwinList
-                    title="Must-Haves"
-                    titleClass="text-secondary border-secondary/20"
-                    items={[
-                      {
-                        icon: "check_circle",
-                        iconClass: "text-emerald-600",
-                        text: "8+ Yrs Distributed Systems",
-                      },
-                      {
-                        icon: "check_circle",
-                        iconClass: "text-emerald-600",
-                        text: "LLM Fine-tuning (PyTorch)",
-                      },
-                      {
-                        icon: "check_circle",
-                        iconClass: "text-emerald-600",
-                        text: "Vector DB Architecture",
-                      },
-                    ]}
-                  />
-
-                  <TwinList
-                    title="Ideal Traits"
-                    titleClass="text-tertiary border-tertiary/20"
-                    items={[
-                      {
-                        icon: "bolt",
-                        iconClass: "text-tertiary",
-                        text: "Startup DNA (Fast Shipping)",
-                      },
-                      {
-                        icon: "hub",
-                        iconClass: "text-tertiary",
-                        text: "Technical Leadership",
-                      },
-                      {
-                        icon: "forum",
-                        iconClass: "text-tertiary",
-                        text: "Product Mindset",
-                      },
-                    ]}
-                  />
-                </div>
+                {archetype && (
+                  <div className="space-y-2">
+                    <p className="font-label-md text-on-surface-variant">Affinity Scores</p>
+                    <div className="space-y-1">
+                      {Object.entries(archetype.affinity_scores).slice(0, 5).map(([name, score]) => (
+                        <div key={name} className="flex items-center gap-2 text-body-sm">
+                          <span className="flex-1 truncate">{name}</span>
+                          <div className="h-2 w-32 overflow-hidden rounded-full bg-surface-container-high">
+                            <div
+                              className="h-full rounded-full bg-secondary"
+                              style={{ width: `${score}%` }}
+                            />
+                          </div>
+                          <span className="w-10 text-right font-bold text-on-surface-variant">{score.toFixed(0)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="border-t border-outline-variant pt-4">
                   <p className="mb-2 font-label-md text-on-surface-variant">
@@ -204,9 +161,22 @@ export default function TalentTwinPage() {
               </div>
 
               <div className="custom-scrollbar max-h-[460px] space-y-4 overflow-y-auto p-lg">
-                {topMatches.map((candidate) => (
-                  <MatchCard key={candidate.name} {...candidate} />
-                ))}
+                {twins === null ? (
+                  <p className="text-center text-body-sm text-on-surface-variant">Loading twins...</p>
+                ) : twins.twins.length === 0 ? (
+                  <p className="text-center text-body-sm text-on-surface-variant">No twins found.</p>
+                ) : (
+                  twins.twins.map((twin, idx) => (
+                    <MatchCard
+                      key={twin.id}
+                      name={twin.name}
+                      role={`${twin.archetype}`}
+                      score={`${twin.twin_similarity.toFixed(0)}%`}
+                      image=""
+                      active={idx === 0}
+                    />
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -386,35 +356,6 @@ export default function TalentTwinPage() {
   );
 }
 
-function TwinList({
-  title,
-  titleClass,
-  items,
-}: {
-  title: string;
-  titleClass: string;
-  items: { icon: string; iconClass: string; text: string }[];
-}) {
-  return (
-    <div className="space-y-3">
-      <h4 className={`border-b pb-1 font-label-md ${titleClass}`}>{title}</h4>
-
-      <ul className="space-y-2">
-        {items.map((item) => (
-          <li key={item.text} className="flex items-center gap-2 text-body-sm">
-            <span
-              className={`material-symbols-outlined text-sm ${item.iconClass}`}
-            >
-              {item.icon}
-            </span>
-            {item.text}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function MatchCard({
   name,
   role,
@@ -426,10 +367,11 @@ function MatchCard({
   name: string;
   role: string;
   score: string;
-  image: string;
+  image?: string;
   active: boolean;
   badge?: string;
 }) {
+  const initials = name.split(" ").map(s => s[0]).join("").slice(0, 2);
   return (
     <div
       className={[
@@ -442,11 +384,17 @@ function MatchCard({
       <div className="relative">
         <div
           className={[
-            "h-14 w-14 overflow-hidden rounded-full",
+            "flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white",
             active ? "border-2 border-primary" : "border border-outline",
           ].join(" ")}
         >
-          <img className="h-full w-full object-cover" alt={name} src={image} />
+          {image ? (
+            <img className="h-full w-full object-cover" alt={name} src={image} />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-secondary/70">
+              {initials}
+            </div>
+          )}
         </div>
 
         {badge && (

@@ -10,3 +10,4 @@ sentence-transformers==5.6.0
 spacy>=3.7,<4
 faiss-cpu==1.14.3
 shap>=0.46,<1
+statsmodels>=0.14,<1

@@ -211,3 +211,156 @@ class CopilotExplanationRequest(BaseModel):
 
 class CopilotExplanationResponse(BaseModel):
     explanation: str
+
+
+# ── Feature 6: Talent Twin / Benchmarking ────────────────────────────
+
+class TalentTwinClassifyRequest(BaseModel):
+    candidate: dict
+
+
+class AffinityScore(BaseModel):
+    archetype: str
+    score: float
+
+
+class TalentTwinClassifyResponse(BaseModel):
+    primary_archetype: str
+    archetype_traits: str
+    affinity_scores: dict[str, float]
+
+
+class TalentTwinTwinsRequest(BaseModel):
+    candidate: dict
+    top_k: int = 5
+    same_archetype_only: bool = False
+
+
+class TalentTwinTwinResult(BaseModel):
+    id: str
+    name: str
+    twin_similarity: float
+    archetype: str
+
+
+class TalentTwinTwinsResponse(BaseModel):
+    twins: list[TalentTwinTwinResult]
+
+
+class TalentTwinBenchmarkResponse(BaseModel):
+    archetype: str
+    benchmark_score: float
+    summary: str
+    feature_deltas: dict
+
+
+class TalentTwinBestArchetypeRequest(BaseModel):
+    role_signals: dict
+    top_n: int = 3
+
+
+class BestArchetypeResult(BaseModel):
+    archetype: str
+    fit_score: float
+    traits: str
+
+
+class TalentTwinBestArchetypeResponse(BaseModel):
+    results: list[BestArchetypeResult]
+
+
+class PoolCompositionItem(BaseModel):
+    archetype: str
+    count: int
+    pct: float
+    traits: str
+
+
+class TalentTwinPoolCompositionResponse(BaseModel):
+    composition: list[PoolCompositionItem]
+
+
+# ── Feature 7: Behavioral Signals Analysis ──────────────────────────
+
+class BehavioralSignalRequest(BaseModel):
+    candidate_id: str = "CAND-0000"
+
+
+class BehavioralSignalScores(BaseModel):
+    collaboration: float
+    problem_solving: float
+    learning_velocity: float
+    ownership: float
+    communication: float
+    initiative: float
+    overall: float
+
+
+class BehavioralSignalResponse(BaseModel):
+    candidate_id: str
+    scores: BehavioralSignalScores
+    confidence: float
+    top_evidence: dict[str, list[str]]
+
+
+# ── Feature 8: AI Market Insight ───────────────────────────────────
+
+class MarketInsightRequest(BaseModel):
+    skill_cluster: str = "ML / AI Engineering"
+    location: str = "San Francisco"
+
+
+class MarketInsightResponse(BaseModel):
+    skill_cluster: str
+    location: str
+    supply_count: int
+    demand_count: int
+    supply_demand_ratio: float
+    density_label: str
+    density_score: float
+    avg_experience_yrs: float
+    avg_salary_estimate: float
+    competition_index: float
+    trend_direction: str
+    trend_pct_6mo: float
+    forecast_3mo: int
+    top_companies_hiring: list[str]
+    insight_text: str
+
+
+class MarketOpportunityItem(BaseModel):
+    skill_cluster: str
+    location: str
+    opportunity_score: float
+    tier: str
+    density: str
+    trend: str
+    competition: float
+
+
+class MarketOpportunityResponse(BaseModel):
+    results: list[MarketOpportunityItem]
+
+
+class MarketReportRow(BaseModel):
+    skill_cluster: str
+    location: str
+    supply: int
+    demand: int
+    ratio: float
+    density: str
+    competition_index: float
+    trend: str
+    trend_pct_6mo: float
+    forecast_3mo: int
+    avg_salary: float
+    avg_exp_yrs: float
+
+
+class MarketReportResponse(BaseModel):
+    rows: list[MarketReportRow]
+
+
+class MarketClustersResponse(BaseModel):
+    clusters: list[str]
+    locations: list[str]

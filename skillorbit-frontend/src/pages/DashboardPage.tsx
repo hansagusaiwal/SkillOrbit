@@ -1,8 +1,36 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
+import { fetchDashboardStats, fetchRecentJobs } from "../api";
+
+type RecentJob = {
+  id: string;
+  title: string;
+  subtitle: string;
+  scanned: string;
+  score: string;
+  status: string;
+  scoreTone: "emerald" | "amber";
+  statusTone: "emerald" | "amber" | "slate";
+};
+
+type DashStats = {
+  totalCandidatesIndexed: number;
+  activeJobs: number;
+  rankedShortlists: number;
+  avgSuccessScore: number;
+  hiddenGemsFound: number;
+};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState<DashStats | null>(null);
+  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
+
+  useEffect(() => {
+    fetchDashboardStats().then(setStats).catch(() => {});
+    fetchRecentJobs().then(setRecentJobs).catch(() => {});
+  }, []);
 
   return (
     <AppLayout
@@ -80,7 +108,7 @@ export default function DashboardPage() {
               Total Candidates Indexed
             </p>
             <h3 className="font-geist text-[24px] font-semibold leading-[32px] text-on-surface">
-              100,000
+              {stats ? stats.totalCandidatesIndexed.toLocaleString() : "—"}
             </h3>
           </div>
 
@@ -96,7 +124,7 @@ export default function DashboardPage() {
               Active Jobs
             </p>
             <h3 className="font-geist text-[24px] font-semibold leading-[32px] text-on-surface">
-              12
+              {stats ? stats.activeJobs : "—"}
             </h3>
           </div>
 
@@ -112,7 +140,7 @@ export default function DashboardPage() {
               Ranked Shortlists
             </p>
             <h3 className="font-geist text-[24px] font-semibold leading-[32px] text-on-surface">
-              34
+              {stats ? stats.rankedShortlists : "—"}
             </h3>
           </div>
 
@@ -122,7 +150,7 @@ export default function DashboardPage() {
                 Avg Success Score
               </p>
               <h3 className="font-geist text-[24px] font-semibold leading-[32px] text-on-surface">
-                86%
+                {stats ? `${stats.avgSuccessScore}%` : "—"}
               </h3>
             </div>
 
@@ -150,7 +178,7 @@ export default function DashboardPage() {
                 />
               </svg>
               <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-emerald-700">
-                86%
+                {stats ? `${stats.avgSuccessScore}%` : "—"}
               </span>
             </div>
           </div>
@@ -168,7 +196,7 @@ export default function DashboardPage() {
               Hidden Gems Found
             </p>
             <h3 className="font-geist text-[24px] font-semibold leading-[32px] text-on-surface">
-              218
+              {stats ? stats.hiddenGemsFound : "—"}
             </h3>
           </div>
         </div>
@@ -327,45 +355,21 @@ export default function DashboardPage() {
               </thead>
 
               <tbody className="divide-y divide-outline-variant">
-                <JobRow
-                  icon="smart_toy"
-                  iconBg="bg-primary-container/10"
-                  iconColor="text-primary"
-                  title="Senior AI Engineer"
-                  subtitle="San Francisco, CA • Full-time"
-                  scanned="1,248"
-                  scannedChange="+12 today"
-                  score="94/100"
-                  scoreTone="emerald"
-                  status="Active"
-                  statusTone="emerald"
-                />
-
-                <JobRow
-                  icon="layers"
-                  iconBg="bg-secondary/10"
-                  iconColor="text-secondary"
-                  title="Lead Product Manager"
-                  subtitle="Remote • Full-time"
-                  scanned="842"
-                  score="88/100"
-                  scoreTone="amber"
-                  status="Paused"
-                  statusTone="amber"
-                />
-
-                <JobRow
-                  icon="terminal"
-                  iconBg="bg-tertiary/10"
-                  iconColor="text-tertiary"
-                  title="Backend Architecture Lead"
-                  subtitle="Austin, TX • Hybrid"
-                  scanned="2,105"
-                  score="91/100"
-                  scoreTone="emerald"
-                  status="Completed"
-                  statusTone="slate"
-                />
+                {recentJobs.map((job, i) => (
+                  <JobRow
+                    key={job.id}
+                    icon={["smart_toy", "layers", "terminal"][i] || "work"}
+                    iconBg={["bg-primary-container/10", "bg-secondary/10", "bg-tertiary/10"][i] || "bg-surface-container"}
+                    iconColor={["text-primary", "text-secondary", "text-tertiary"][i] || "text-on-surface"}
+                    title={job.title}
+                    subtitle={job.subtitle}
+                    scanned={job.scanned}
+                    score={job.score}
+                    scoreTone={job.scoreTone}
+                    status={job.status}
+                    statusTone={job.statusTone}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
