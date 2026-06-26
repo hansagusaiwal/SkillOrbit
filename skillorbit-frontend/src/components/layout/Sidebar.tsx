@@ -10,6 +10,7 @@ import {
   Search,
   UserRound,
   BarChart3,
+  Bot,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 
@@ -23,6 +24,7 @@ const navItems = [
   { label: "Talent Twin / Compare", path: "/talent-twin", icon: Network },
   { label: "Shortlist Export", path: "/shortlist-export", icon: FileDown },
   { label: "Market Insight", path: "/market-insight", icon: BarChart3 },
+  { label: "AI Copilot", path: "/copilot", icon: Bot },
 ];
 
 export default function Sidebar() {

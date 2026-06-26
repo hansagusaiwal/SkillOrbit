@@ -15,6 +15,20 @@ export type Candidate = {
   hiddenGem?: boolean;
   skills: string[];
   reason: string;
+  skills_overlap: number;
+  years_experience: number;
+  company_prestige: number;
+  job_hop_freq: number;
+  github_activity: number;
+  open_source_contribs: number;
+  leetcode_score: number;
+  education_tier: number;
+  certifications_count: number;
+  project_complexity: number;
+  tech_stack_diversity: number;
+  endorsements_count: number;
+  career_growth_rate: number;
+  response_time_score: number;
 };
 
 export type Job = {
@@ -23,6 +37,7 @@ export type Job = {
   roleCategory: string;
   location: string;
   experienceRange: string;
+  description: string;
   status: "Active" | "Draft" | "Completed";
   candidatesScanned: number;
   topScore: number;

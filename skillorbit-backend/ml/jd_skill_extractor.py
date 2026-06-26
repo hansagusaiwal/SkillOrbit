@@ -14,15 +14,17 @@ SKILL_TAXONOMY = {
     },
     "ml_ai": {
         "PyTorch", "TensorFlow", "Keras", "scikit-learn", "XGBoost",
-        "LightGBM", "Hugging Face", "LangChain", "LlamaIndex", "ONNX",
+        "LightGBM", "CatBoost", "Hugging Face", "LangChain", "LlamaIndex", "ONNX",
         "CUDA", "TensorRT", "MLflow", "Weights & Biases", "Ray", "Triton",
         "RLHF", "RAG", "fine-tuning", "LLMs", "diffusion models",
-        "transformers", "BERT", "GPT", "LoRA", "QLoRA",
+        "transformers", "BERT", "GPT", "LoRA", "QLoRA", "JAX", "Flax",
+        "OpenAI", "Claude", "Gemini", "vector embeddings", "semantic search",
     },
     "data": {
         "Spark", "Kafka", "Airflow", "dbt", "Flink", "Hadoop",
         "Snowflake", "BigQuery", "Redshift", "Databricks", "Delta Lake",
         "Pandas", "NumPy", "Polars", "DuckDB", "Presto",
+        "Tableau", "Power BI", "Looker", "Sigma", "Metabase",
     },
     "infra_devops": {
         "Kubernetes", "Docker", "Terraform", "Ansible", "Helm",
@@ -37,7 +39,8 @@ SKILL_TAXONOMY = {
     "web_frontend": {
         "React", "Next.js", "Vue", "Angular", "Svelte", "Tailwind CSS",
         "Node.js", "Express", "FastAPI", "Django", "Flask", "Spring Boot",
-        "REST APIs", "gRPC", "WebSockets",
+        "REST APIs", "gRPC", "WebSockets", "Redux", "Zustand", "shadcn",
+        "HTML", "CSS", "Sass", "Storybook", "Cypress", "Playwright",
     },
     "practices": {
         "microservices", "distributed systems", "system design",
@@ -75,6 +78,20 @@ MUST_HAVE_PHRASES = [
     "extensive experience", "hands-on experience", "proficiency in",
     "expert in", "3+ years", "5+ years", "solid understanding",
     "demonstrated ability",
+]
+
+MUST_HAVE_SECTION_HEADERS = [
+    "requirements", "qualifications", "required skills", "must have",
+    "what you'll need", "what you will need", "key requirements",
+    "minimum qualifications", "basic qualifications", "what we look for",
+    "about you", "who you are", "we are looking for",
+]
+
+NICE_TO_HAVE_SECTION_HEADERS = [
+    "nice to have", "nice-to-have", "bonus", "bonus points",
+    "good to have", "good-to-have", "preferred", "preferred qualifications",
+    "plus", "a plus", "would be nice", "desirable", "additional",
+    "what would make you stand out",
 ]
 
 
@@ -115,9 +132,14 @@ class JDSkillExtractor:
             )
 
     def _clean(self, text: str) -> str:
-        text = re.sub(r"\s+", " ", text)
+        # Normalize line endings
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        # Replace bullet characters with newlines
         text = re.sub(r"[•●▪▸◦‣·]", "\n", text)
+        # Collapse excessive blank lines
         text = re.sub(r"\n{3,}", "\n\n", text)
+        # Trim trailing spaces on each line (but preserve line structure)
+        text = "\n".join(" ".join(line.split()) for line in text.split("\n"))
         return text.strip()
 
     def _extract_years(self, text: str) -> tuple[Optional[int], Optional[int]]:
@@ -141,25 +163,47 @@ class JDSkillExtractor:
 
     def _detect_level(self, text: str) -> str:
         text_lower = text.lower()
-        for level, signals in LEVEL_SIGNALS.items():
-            if any(sig in text_lower for sig in signals):
-                return level
-        return "mid"
+        matched_levels = [lvl for lvl, signals in LEVEL_SIGNALS.items() if any(sig in text_lower for sig in signals)]
+        if not matched_levels:
+            return "mid"
+        level_rank = ["junior", "mid", "senior", "staff", "lead", "manager"]
+        best = max(matched_levels, key=lambda lvl: level_rank.index(lvl) if lvl in level_rank else -1)
+        return best
 
     def _detect_role_category(self, title: str, text: str) -> str:
-        combined = (title + " " + text[:500]).lower()
-        if any(k in combined for k in ["machine learning", "ml engineer", "ai engineer", "deep learning", "llm", "nlp"]):
-            return "ml_ai"
-        if any(k in combined for k in ["data engineer", "data scientist", "analytics", "etl", "pipeline"]):
-            return "data"
-        if any(k in combined for k in ["frontend", "front-end", "react", "ui engineer", "web"]):
-            return "frontend"
-        if any(k in combined for k in ["devops", "platform engineer", "sre", "infrastructure", "cloud"]):
-            return "infra"
-        if any(k in combined for k in ["backend", "back-end", "api", "microservice", "systems"]):
-            return "backend"
-        if any(k in combined for k in ["manager", "director", "vp of", "head of"]):
-            return "management"
+        title_lower = title.lower()
+        text_lower = text.lower()
+
+        title_keywords = {
+            "ml_ai":     ["machine learning", "ml engineer", "ai engineer", "ml", "ai", "deep learning", "llm", "nlp", "data scientist"],
+            "data":      ["data engineer", "data architect", "analytics engineer", "etl", "data pipeline"],
+            "frontend":  ["frontend", "front-end", "ui engineer", "ui developer", "react developer"],
+            "backend":   ["backend", "back-end", "backend engineer", "back-end engineer"],
+            "infra":     ["devops", "platform engineer", "sre", "infrastructure engineer", "cloud engineer"],
+            "management": ["engineering manager", "director of", "vp of", "head of", "cto"],
+        }
+
+        # Score title matches heavily
+        title_score = {}
+        for cat, kws in title_keywords.items():
+            if any(kw in title_lower for kw in kws):
+                title_score[cat] = 3
+
+        # Score text matches with lower weight, but scan full text
+        text_keywords = {
+            "ml_ai":     ["pytorch", "tensorflow", "machine learning", "deep learning", "llm", "nlp", "computer vision"],
+            "data":      ["spark", "kafka", "etl pipeline", "data pipeline", "data warehouse", "bigquery"],
+            "frontend":  ["react", "vue", "angular", "frontend", "front-end", "ui", "tailwind"],
+            "backend":   ["microservice", "rest api", "grpc", "spring boot", "fastapi", "django"],
+            "infra":     ["kubernetes", "docker", "terraform", "ci/cd", "aws", "gcp", "azure", "devops"],
+            "management": ["stakeholder", "roadmap", "team of", "manage a team", "leadership"],
+        }
+        for cat, kws in text_keywords.items():
+            if any(kw in text_lower for kw in kws):
+                title_score[cat] = title_score.get(cat, 0) + 1
+
+        if title_score:
+            return max(title_score, key=title_score.get)
         return "engineering"
 
     def _extract_role_title(self, text: str) -> str:
@@ -173,29 +217,82 @@ class JDSkillExtractor:
                 return line
         return lines[0] if lines else "Unknown Role"
 
-    def _sentence_signal(self, sentence: str) -> tuple[bool, bool]:
+    def _detect_sections(self, text: str) -> dict[int, str]:
+        lines = text.split("\n")
+        section_map = {}
+        current_type = "neutral"
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            line_lower = stripped.lower().rstrip(":")
+            is_bullet = stripped.startswith(("-", "•", "*", "·", "1.", "2.", "3."))
+            is_short_heading = (
+                len(stripped) < 70
+                and not is_bullet
+                and not stripped.endswith((".", "?", "!"))
+                and stripped[0].isupper()
+            )
+            if is_short_heading:
+                line_words = set(line_lower.split())
+                # Check nice-to-have first (more specific, e.g. "Preferred Qualifications")
+                if any(h in line_lower for h in NICE_TO_HAVE_SECTION_HEADERS):
+                    current_type = "nice_to_have"
+                elif any(h in line_lower for h in MUST_HAVE_SECTION_HEADERS):
+                    current_type = "must_have"
+                elif any(kw in line_lower for kw in ["engineer", "scientist", "developer", "analyst", "architect"]):
+                    current_type = "neutral"
+                else:
+                    current_type = "neutral"
+            elif not is_bullet and stripped[0].isupper() and len(stripped) > 70:
+                current_type = "neutral"
+            section_map[i] = current_type
+        return section_map
+
+    def _sentence_signal(self, sentence: str, section_type: str = "neutral") -> tuple[bool, bool]:
         sl = sentence.lower()
         must  = any(p in sl for p in MUST_HAVE_PHRASES)
         nice  = any(p in sl for p in NEGATIVE_PHRASES)
+
+        if section_type == "must_have" and not nice:
+            must = True
+        if section_type == "nice_to_have" and not must:
+            nice = True
+
         if must and nice:
             return False, True
         return must, nice
 
-    def _taxonomy_lookup(self, text: str, sentences: list[str]) -> list[ExtractedSkill]:
+    def _get_section_for_line(self, line_no: int, section_map: dict[int, str]) -> str:
+        if not section_map:
+            return "neutral"
+        closest = None
+        best_type = "neutral"
+        for ln, st in section_map.items():
+            if ln <= line_no:
+                if closest is None or ln > closest:
+                    closest = ln
+                    best_type = st
+        return best_type
+
+    def _taxonomy_lookup(self, text: str, lines: list[str], section_map: dict[int, str] | None = None) -> list[ExtractedSkill]:
         found = {}
-        for sent in sentences:
-            sent_lower = sent.lower()
+        for line_idx, line in enumerate(lines):
+            line_lower = line.lower().strip()
+            if not line_lower:
+                continue
+            section_type = self._get_section_for_line(line_idx, section_map) if section_map else "neutral"
             for skill_lower, skill_name in _SKILL_LOWER_MAP.items():
                 pattern = r'\b' + re.escape(skill_lower) + r'\b'
-                if re.search(pattern, sent_lower):
-                    is_must, is_nice = self._sentence_signal(sent)
+                if re.search(pattern, line_lower):
+                    is_must, is_nice = self._sentence_signal(line, section_type)
                     if skill_lower not in found:
                         found[skill_lower] = ExtractedSkill(
                             name=skill_name,
                             category=_CATEGORY_MAP[skill_lower],
                             is_must_have=is_must,
                             is_nice_to_have=is_nice,
-                            context=sent.strip(),
+                            context=line.strip(),
                             confidence=0.95,
                         )
                     else:
@@ -203,27 +300,32 @@ class JDSkillExtractor:
                             found[skill_lower].is_must_have = True
         return list(found.values())
 
-    def _spacy_ner(self, text: str, already_found: set[str]) -> list[ExtractedSkill]:
+    def _spacy_ner(self, text: str, already_found: set[str], section_map: dict[int, str] | None = None) -> list[ExtractedSkill]:
         doc = self.nlp(text[:100_000])
         extras = []
         for ent in doc.ents:
-            if ent.label_ in {"ORG", "PRODUCT", "GPE"} and len(ent.text) > 2:
-                name = ent.text.strip()
+            name = ent.text.strip()
+            if "\n" in name or not name.isprintable():
+                continue
+            if ent.label_ in {"ORG", "PRODUCT", "GPE"} and len(name) > 2:
                 if name.lower() not in already_found and len(name) < 40:
-                    sent_text = ent.sent.text
-                    is_must, is_nice = self._sentence_signal(sent_text)
+                    line_no = text[:ent.start_char].count("\n")
+                    section_type = self._get_section_for_line(line_no, section_map) if section_map else "neutral"
+                    context_line = text.split("\n")[line_no] if line_no < len(text.split("\n")) else ent.sent.text
+                    is_must, is_nice = self._sentence_signal(context_line, section_type)
                     extras.append(ExtractedSkill(
                         name=name,
                         category="other",
                         is_must_have=is_must,
                         is_nice_to_have=is_nice,
-                        context=sent_text.strip(),
+                        context=context_line.strip(),
                         confidence=0.65,
                     ))
         return extras
 
     def extract(self, jd_text: str) -> JDExtractionResult:
         clean_text = self._clean(jd_text)
+        lines = clean_text.split("\n")
         doc = self.nlp(clean_text[:100_000])
         sentences = [sent.text for sent in doc.sents]
 
@@ -232,10 +334,11 @@ class JDSkillExtractor:
         exp_level     = self._detect_level(clean_text)
         min_yr, max_yr = self._extract_years(clean_text)
 
-        taxonomy_skills = self._taxonomy_lookup(clean_text, sentences)
+        section_map = self._detect_sections(clean_text)
+        taxonomy_skills = self._taxonomy_lookup(clean_text, lines, section_map)
         found_lower = {s.name.lower() for s in taxonomy_skills}
 
-        ner_extras = self._spacy_ner(clean_text, found_lower)
+        ner_extras = self._spacy_ner(clean_text, found_lower, section_map)
 
         all_skills = taxonomy_skills + ner_extras
 

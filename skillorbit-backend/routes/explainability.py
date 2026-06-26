@@ -9,7 +9,8 @@ from models import (
     CopilotExplanationRequest, CopilotExplanationResponse,
     ShapFeature,
 )
-from ml.explainability import ExplainabilityEngine, generate_and_train, FEATURE_COLS
+from ml.explainability import ExplainabilityEngine, _get_engine, FEATURE_COLS
+from data import raw_candidates
 
 _engine: ExplainabilityEngine | None = None
 _training_df: pd.DataFrame | None = None
@@ -18,9 +19,11 @@ _training_df: pd.DataFrame | None = None
 def get_engine() -> tuple[ExplainabilityEngine, pd.DataFrame]:
     global _engine, _training_df
     if _engine is None:
-        model, scaler, df = generate_and_train(n=1000)
-        _engine = ExplainabilityEngine(model, scaler, FEATURE_COLS)
-        _training_df = df
+        _engine = _get_engine()
+        _training_df = pd.DataFrame([
+            {col: c[col] for col in FEATURE_COLS}
+            for c in raw_candidates
+        ])
     return _engine, _training_df
 
 

@@ -9,12 +9,50 @@ export function fetchJob(id: string) {
   return api.get<Job>(`/jobs/${id}`);
 }
 
-export function createJob(job: Partial<Job>) {
+export type JobCreatePayload = {
+  title: string;
+  roleCategory: string;
+  location: string;
+  experienceRange: string;
+  description: string;
+  status: "Active" | "Draft";
+};
+
+export function createJob(job: JobCreatePayload) {
   return api.post<Job>("/jobs", job);
+}
+
+export function activateJob(jobId: string) {
+  return api.patch<Job>(`/jobs/${jobId}`, { status: "Active" });
 }
 
 export function fetchCandidates() {
   return api.get<Candidate[]>("/candidates");
+}
+
+export type RankedCandidate = {
+  rank: number;
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  yoe: number;
+  skills: string;
+  location: string;
+  semantic_sim: number;
+  technicalFit: number;
+  skillMatch: number;
+  experienceLevel: number;
+  careerGrowth: number;
+  cultureSignal: number;
+  successScore: number;
+};
+
+export function rankCandidates(jdText: string, topK: number = 50) {
+  return api.post<RankedCandidate[]>("/candidates/rank", {
+    job_description: jdText,
+    top_k: topK,
+  });
 }
 
 export function fetchCandidate(id: string) {
@@ -44,6 +82,9 @@ export function fetchDashboardStats() {
     rankedShortlists: number;
     avgSuccessScore: number;
     hiddenGemsFound: number;
+    candidateQualityDistribution: { label: string; indexed: number; benchmarked: number }[];
+    talentPoolByRole: { label: string; value: number; color: string }[];
+    insight: string;
   }>("/dashboard/stats");
 }
 
@@ -306,4 +347,42 @@ export function getMarketReport() {
       avg_exp_yrs: number;
     }[];
   }>("/market-insight/report");
+}
+
+// ── Feature 9: Recruitability Prediction ────────────────────────────
+
+export function predictRecruitability(candidate: Record<string, number>) {
+  return api.post<{
+    recruitable_prob: number;
+    recruitable_label: string;
+    top_signals: { feature: string; value: number; direction: string; importance: number }[];
+    urgency_flag: boolean;
+    recommended_action: string;
+  }>("/recruitability/predict", { candidate });
+}
+
+export function batchPredictRecruitability(candidates: { candidate_id: string; name: string; features: Record<string, number> }[]) {
+  return api.post<{
+    results: { candidate_id: string; name: string; recruitable_prob: number; recruitable_label: string; urgency_flag: boolean }[];
+  }>("/recruitability/batch-predict", { candidates });
+}
+
+// ── Feature 10: Copilot / RAG Chatbot ───────────────────────────────
+
+export function copilotQuery(query: string, topK: number = 8) {
+  return api.post<{
+    answer: string;
+    intent: string;
+    sources: string[];
+    chunks_used: number;
+    latency_s: number;
+  }>("/copilot/query", { query, top_k: topK });
+}
+
+export function copilotReset() {
+  return api.post<{ status: string }>("/copilot/reset", {});
+}
+
+export function copilotSuggestions() {
+  return api.get<{ questions: string[] }>("/copilot/suggestions");
 }

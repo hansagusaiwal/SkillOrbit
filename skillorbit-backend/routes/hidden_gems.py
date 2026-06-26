@@ -38,25 +38,6 @@ def _build_candidate_df() -> pd.DataFrame:
             "githubActivity":   c.get("github_activity", 0.5),
             "openSourcePRs":    c.get("open_source_contribs", 0),
         })
-    if len(scored) < 20:
-        np.random.seed(42)
-        n = 50 - len(scored)
-        for i in range(n):
-            rows.append({
-                "id": f"CAND-{len(rows)+1:04d}",
-                "name": f"Candidate {len(rows)+1}",
-                "role": np.random.choice(["Engineer", "Scientist", "Analyst"]),
-                "company": "Synthetic",
-                "successScore":     np.random.uniform(30, 99),
-                "technicalFit":     np.random.uniform(30, 99),
-                "skillMatch":       np.random.uniform(20, 99),
-                "experienceLevel":  np.random.uniform(30, 95),
-                "careerGrowth":     np.random.uniform(20, 99),
-                "learningVelocity": np.random.uniform(0, 1),
-                "careerGrowthRate": np.random.uniform(-0.2, 2),
-                "githubActivity":   np.random.uniform(0, 1),
-                "openSourcePRs":    np.random.randint(0, 80),
-            })
     return pd.DataFrame(rows)
 
 

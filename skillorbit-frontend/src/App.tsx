@@ -12,6 +12,7 @@ import HiddenGemsPage from "./pages/HiddenGemsPage";
 import TalentTwinPage from "./pages/TalentTwinPage";
 import ShortlistExportPage from "./pages/ShortlistExportPage";
 import MarketInsightPage from "./pages/MarketInsightPage";
+import CopilotPage from "./pages/CopilotPage";
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/talent-twin" element={<TalentTwinPage />} />
         <Route path="/shortlist-export" element={<ShortlistExportPage />} />
         <Route path="/market-insight" element={<MarketInsightPage />} />
+        <Route path="/copilot" element={<CopilotPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

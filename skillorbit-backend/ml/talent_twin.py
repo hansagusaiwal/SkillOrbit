@@ -11,72 +11,25 @@ warnings.filterwarnings("ignore")
 
 
 def generate_pool(n: int = 600, seed: int = 42) -> tuple[pd.DataFrame, list[str]]:
-    np.random.seed(seed)
+    from data import raw_candidates
+    from ml.model import CandidateSuccessModel
+    import random
 
-    archetypes = {
-        "Startup Founder-Engineer": dict(
-            skills_overlap=0.65, years_experience=8,  company_prestige=2,
-            github_activity=0.90, leetcode_score=0.55, project_complexity=0.90,
-            tech_stack_diversity=0.92, career_growth_rate=1.8, open_source_contribs=55,
-            education_tier=2, certifications_count=1,  endorsements_count=80,
-            job_hop_freq=1.2, response_time_score=0.70,
-        ),
-        "Big-Co ML Specialist": dict(
-            skills_overlap=0.88, years_experience=6,  company_prestige=5,
-            github_activity=0.55, leetcode_score=0.85, project_complexity=0.75,
-            tech_stack_diversity=0.60, career_growth_rate=0.9, open_source_contribs=15,
-            education_tier=4, certifications_count=5,  endorsements_count=160,
-            job_hop_freq=2.5, response_time_score=0.55,
-        ),
-        "Research Scientist": dict(
-            skills_overlap=0.70, years_experience=5,  company_prestige=4,
-            github_activity=0.65, leetcode_score=0.78, project_complexity=0.85,
-            tech_stack_diversity=0.50, career_growth_rate=0.7, open_source_contribs=30,
-            education_tier=4, certifications_count=2,  endorsements_count=90,
-            job_hop_freq=3.0, response_time_score=0.60,
-        ),
-        "Full-Stack Product Engineer": dict(
-            skills_overlap=0.72, years_experience=4,  company_prestige=3,
-            github_activity=0.75, leetcode_score=0.60, project_complexity=0.65,
-            tech_stack_diversity=0.88, career_growth_rate=1.1, open_source_contribs=20,
-            education_tier=2, certifications_count=3,  endorsements_count=70,
-            job_hop_freq=1.8, response_time_score=0.85,
-        ),
-        "Platform / Infra Engineer": dict(
-            skills_overlap=0.80, years_experience=7,  company_prestige=4,
-            github_activity=0.70, leetcode_score=0.65, project_complexity=0.80,
-            tech_stack_diversity=0.75, career_growth_rate=0.8, open_source_contribs=25,
-            education_tier=3, certifications_count=7,  endorsements_count=110,
-            job_hop_freq=2.8, response_time_score=0.65,
-        ),
-        "Early-Career High-Potential": dict(
-            skills_overlap=0.55, years_experience=2,  company_prestige=2,
-            github_activity=0.85, leetcode_score=0.80, project_complexity=0.50,
-            tech_stack_diversity=0.70, career_growth_rate=1.6, open_source_contribs=40,
-            education_tier=3, certifications_count=4,  endorsements_count=30,
-            job_hop_freq=0.8, response_time_score=0.90,
-        ),
-    }
+    FEATURE_COLS = CandidateSuccessModel.FEATURE_COLS
+    pool = list(raw_candidates)
+    random.Random(seed).shuffle(pool)
+    pool = pool[:n]
 
-    FEATURE_COLS = list(list(archetypes.values())[0].keys())
     rows = []
-    per_archetype = n // len(archetypes)
-
-    for arch_name, center in archetypes.items():
-        for _ in range(per_archetype):
-            row = {
-                k: float(np.clip(
-                    v + np.random.normal(0, abs(v) * 0.18 + 0.05),
-                    0, max(v * 2, 1)
-                ))
-                for k, v in center.items()
-            }
-            row["true_archetype"] = arch_name
-            rows.append(row)
+    for c in pool:
+        row = {col: c[col] for col in FEATURE_COLS}
+        row["id"] = c["id"]
+        row["name"] = c["name"]
+        row["role"] = c["role"]
+        row["company"] = c["company"]
+        rows.append(row)
 
     df = pd.DataFrame(rows).reset_index(drop=True)
-    df["id"]   = [f"CAND-{i:04d}" for i in range(len(df))]
-    df["name"] = [f"Candidate {i}"  for i in range(len(df))]
     return df, FEATURE_COLS
 
 
