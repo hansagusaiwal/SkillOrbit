@@ -9,12 +9,50 @@ export function fetchJob(id: string) {
   return api.get<Job>(`/jobs/${id}`);
 }
 
-export function createJob(job: Partial<Job>) {
+export type JobCreatePayload = {
+  title: string;
+  roleCategory: string;
+  location: string;
+  experienceRange: string;
+  description: string;
+  status: "Active" | "Draft";
+};
+
+export function createJob(job: JobCreatePayload) {
   return api.post<Job>("/jobs", job);
+}
+
+export function activateJob(jobId: string) {
+  return api.patch<Job>(`/jobs/${jobId}`, { status: "Active" });
 }
 
 export function fetchCandidates() {
   return api.get<Candidate[]>("/candidates");
+}
+
+export type RankedCandidate = {
+  rank: number;
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  yoe: number;
+  skills: string;
+  location: string;
+  semantic_sim: number;
+  technicalFit: number;
+  skillMatch: number;
+  experienceLevel: number;
+  careerGrowth: number;
+  cultureSignal: number;
+  successScore: number;
+};
+
+export function rankCandidates(jdText: string, topK: number = 50) {
+  return api.post<RankedCandidate[]>("/candidates/rank", {
+    job_description: jdText,
+    top_k: topK,
+  });
 }
 
 export function fetchCandidate(id: string) {
@@ -44,6 +82,9 @@ export function fetchDashboardStats() {
     rankedShortlists: number;
     avgSuccessScore: number;
     hiddenGemsFound: number;
+    candidateQualityDistribution: { label: string; indexed: number; benchmarked: number }[];
+    talentPoolByRole: { label: string; value: number; color: string }[];
+    insight: string;
   }>("/dashboard/stats");
 }
 

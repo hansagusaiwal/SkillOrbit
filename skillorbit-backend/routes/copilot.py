@@ -1,20 +1,37 @@
+import os
+import joblib
 from fastapi import APIRouter, HTTPException
 from models import CopilotQueryRequest, CopilotQueryResponse, CopilotResetResponse, CopilotSuggestionsResponse
 from ml.copilot import RecruiterCopilot, VectorStore, build_candidate_knowledge_base
 
+CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", "ml", "copilot_cache.pkl")
+
 _store: VectorStore | None = None
 _copilot: RecruiterCopilot | None = None
+
+
+def _build_and_cache() -> RecruiterCopilot:
+    global _store, _copilot
+    documents = build_candidate_knowledge_base(n=2000)
+    _store = VectorStore()
+    _store.build(documents)
+    _copilot = RecruiterCopilot(vector_store=_store)
+    joblib.dump({"documents": documents, "index": _store.index}, CACHE_PATH)
+    return _copilot
 
 
 def get_copilot() -> RecruiterCopilot:
     global _store, _copilot
     if _copilot is not None:
         return _copilot
-    documents = build_candidate_knowledge_base(n=30)
-    _store = VectorStore()
-    _store.build(documents)
-    _copilot = RecruiterCopilot(vector_store=_store)
-    return _copilot
+    if os.path.isfile(CACHE_PATH):
+        cached = joblib.load(CACHE_PATH)
+        _store = VectorStore()
+        _store.documents = cached["documents"]
+        _store.index = cached["index"]
+        _copilot = RecruiterCopilot(vector_store=_store)
+        return _copilot
+    return _build_and_cache()
 
 
 router = APIRouter()

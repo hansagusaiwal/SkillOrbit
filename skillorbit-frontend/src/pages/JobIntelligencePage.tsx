@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import { extractJDSkills } from "../api";
 
 export default function JobIntelligencePage() {
   const navigate = useNavigate();
-  const [jdText, setJdText] = useState("");
+  const location = useLocation();
+  const initialJdText = (location.state as { jdText?: string } | null)?.jdText ?? "";
+  const [jdText, setJdText] = useState(initialJdText);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Awaited<ReturnType<typeof extractJDSkills>> | null>(null);
@@ -229,7 +231,7 @@ export default function JobIntelligencePage() {
               </div>
               <div className="flex w-full items-center gap-3 md:w-auto">
                 <button
-                  onClick={() => navigate("/candidate-discovery")}
+                  onClick={() => navigate("/candidate-discovery", { state: { jdResult: result, jdText } })}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-xl py-3 font-bold text-white shadow-lg shadow-primary/30 transition-all hover:scale-105 active:scale-95 md:flex-none"
                 >
                   Find Best Candidates

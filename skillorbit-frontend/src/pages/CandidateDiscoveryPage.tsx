@@ -1,51 +1,212 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
+import { fetchCandidates, fetchHiddenGems, getMarketInsight, getMarketOptions, rankCandidates } from "../api";
+import type { Candidate } from "../types";
 
-const candidates = [
-  {
-    rank: 1,
-    name: "Aarav Mehta",
-    role: "Lead AI Engineer @ TechFlow",
-    tech: 94,
-    recruit: 88,
-    growth: 91,
-    success: 92,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCJbCRF2Y0AwKrBTbCfgpgCcvBd1lVy0QV0Y9Cp6PULZJoMSzgRIYJKJWXgviPeU3W3bb46vu_KUFrEMcS40EdH760toqA967Ou7sWmTBQ5G810qP3BbHmi1XrLX9W-89J5oMxwNQnD9BtRGk2nuFvbWcUkHX__XzOVue2johhGbF0PtZ8q4nifIy6dZHp1OvVtSVxjV6Kcr8z2sWGPFwi7TzkzPdmFAJ9KoWATYNkg40AKNCkBQun5Muo-_k1d13VBBTkGbV21tEjq",
-  },
-  {
-    rank: 2,
-    name: "Neha Iyer",
-    role: "Senior ML Research Scientist",
-    tech: 91,
-    recruit: 85,
-    growth: 89,
-    success: 90,
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDO3HwDCneMc2UFObQxN7nBsUvGFP64K-u-hZEP60nXs0jzuLFLT-GhUIUegsSGZKZbfRmRb-fIE39xXjAfDNoreQXFJWLi_e0dlAsykM1GJn3aY-tHF6ekoa-kgLNifYoqpuJ6SV3z0APG0q9lMyYCBl_fts-Y7we0Z2A3VrzHK2za27ohdHDjeIj17cBAj-190TxW0LKp1N73-mWMqIDOL-oyM0Ptsgif-9NjDWGfw70esOcfGvEvVdtFGYJ63UlacyFep_08Zr58",
-  },
-];
+type JDSkill = {
+  name: string;
+  category: string;
+  context: string;
+  confidence: number;
+};
+
+type JDResult = {
+  role_title: string;
+  role_category: string;
+  experience_level: string;
+  min_years: number | null;
+  max_years: number | null;
+  must_have_skills: JDSkill[];
+  nice_to_have_skills: JDSkill[];
+  negative_signals: string[];
+  all_skills: string[];
+  summary: { total_skills_found: number; must_have_count: number; nice_to_have_count: number; categories_covered: string[] };
+};
 
 export default function CandidateDiscoveryPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const jdResult = (location.state as { jdResult?: JDResult; jdText?: string } | null)?.jdResult;
+  const jdText = (location.state as { jdText?: string } | null)?.jdText;
 
-  const [skillMatch, setSkillMatch] = useState(80);
-  const [experienceMax, setExperienceMax] = useState(12);
-  const [successScore, setSuccessScore] = useState(85);
+  const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [marketInsight, setMarketInsight] = useState<{
+    salary: string;
+    demandLabel: string;
+    demandTone: string;
+    pressure: number;
+  } | null>(null);
 
-  const [hiddenGemsOnly, setHiddenGemsOnly] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
+
+  const [skillMatch, setSkillMatch] = useState(50);
+  const [experienceMax, setExperienceMax] = useState(15);
+  const [successScore, setSuccessScore] = useState(50);
+  const [hiddenGemsOnly, setHiddenGemsOnly] = useState(false);
   const [remoteCandidates, setRemoteCandidates] = useState(false);
-  const [highRecruitability, setHighRecruitability] = useState(true);
+  const [highRecruitability, setHighRecruitability] = useState(false);
+  const [jdSkillNames, setJdSkillNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (jdResult) {
+      if (jdResult.max_years) setExperienceMax(jdResult.max_years);
+      setJdSkillNames(jdResult.must_have_skills.map((s) => s.name.toLowerCase()));
+      setSkillMatch(0);
+      setSuccessScore(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    getMarketOptions().then((opts) => {
+      const cluster = opts.clusters[0] ?? "ML / AI Engineering";
+      const loc = opts.locations[0] ?? "San Francisco";
+
+      getMarketInsight(cluster, loc).then((data) => {
+        const salary = `$${Math.round(data.avg_salary_estimate - 27500).toLocaleString()} - $${Math.round(data.avg_salary_estimate + 27500).toLocaleString()}`;
+        let demandTone = "bg-error-container text-on-error-container";
+        if (data.density_label.toLowerCase().includes("moderate")) {
+          demandTone = "bg-amber-100 text-amber-800";
+        } else if (!data.density_label.toLowerCase().includes("high")) {
+          demandTone = "bg-emerald-100 text-emerald-800";
+        }
+        setMarketInsight({
+          salary,
+          demandLabel: data.density_label,
+          demandTone,
+          pressure: Math.round(data.competition_index * 100),
+        });
+      }).catch(() => {
+        setMarketInsight(null);
+      });
+    }).catch(() => {
+      getMarketInsight("ML / AI Engineering", "San Francisco").then((data) => {
+        const salary = `$${Math.round(data.avg_salary_estimate - 27500).toLocaleString()} - $${Math.round(data.avg_salary_estimate + 27500).toLocaleString()}`;
+        let demandTone = "bg-error-container text-on-error-container";
+        if (data.density_label.toLowerCase().includes("moderate")) {
+          demandTone = "bg-amber-100 text-amber-800";
+        } else if (!data.density_label.toLowerCase().includes("high")) {
+          demandTone = "bg-emerald-100 text-emerald-800";
+        }
+        setMarketInsight({
+          salary,
+          demandLabel: data.density_label,
+          demandTone,
+          pressure: Math.round(data.competition_index * 100),
+        });
+      }).catch(() => {
+        setMarketInsight(null);
+      });
+    });
+  }, []);
+
+  function toCandidate(r: import("../api").RankedCandidate): Candidate {
+    const skillsList = r.skills.split(",").map((s) => s.trim());
+    return {
+      id: r.id,
+      name: r.name,
+      role: r.role,
+      company: r.company,
+      location: r.location,
+      experience: `${r.yoe} years`,
+      technicalFit: r.technicalFit,
+      skillMatch: r.skillMatch,
+      experienceMatch: r.experienceLevel,
+      recruitability: r.cultureSignal,
+      careerGrowth: r.careerGrowth,
+      learningVelocity: 0,
+      successScore: r.successScore,
+      skills: skillsList,
+      reason: "",
+      skills_overlap: 0,
+      years_experience: r.yoe,
+      company_prestige: 0,
+      job_hop_freq: 0,
+      github_activity: 0,
+      open_source_contribs: 0,
+      leetcode_score: 0,
+      education_tier: 0,
+      certifications_count: 0,
+      project_complexity: 0,
+      tech_stack_diversity: 0,
+      endorsements_count: 0,
+      career_growth_rate: 0,
+      response_time_score: 0,
+    };
+  }
+
+  function loadCandidates() {
+    setLoading(true);
+    setError(false);
+    if (jdText) {
+      rankCandidates(jdText)
+        .then((ranked) => setAllCandidates(ranked.map(toCandidate)))
+        .catch(() => setError(true))
+        .finally(() => setLoading(false));
+    } else {
+      const fetcher = hiddenGemsOnly ? fetchHiddenGems() : fetchCandidates();
+      fetcher
+        .then(setAllCandidates)
+        .catch(() => setError(true))
+        .finally(() => setLoading(false));
+    }
+  }
+
+  useEffect(() => {
+    loadCandidates();
+  }, [hiddenGemsOnly, jdText]);
 
   function clearFilters() {
-    setSkillMatch(80);
-    setExperienceMax(12);
-    setSuccessScore(85);
+    setSkillMatch(jdResult ? 0 : 50);
+    setExperienceMax(jdResult?.max_years ?? 15);
+    setSuccessScore(jdResult ? 0 : 50);
     setHiddenGemsOnly(false);
     setRemoteCandidates(false);
     setHighRecruitability(false);
+    setCurrentPage(1);
   }
+
+  const filteredCandidates = allCandidates.filter((c) => {
+    if (c.skillMatch < skillMatch) return false;
+    if (c.successScore < successScore) return false;
+    const expYears = parseFloat(c.experience);
+    if (!isNaN(expYears) && expYears > experienceMax) return false;
+    if (highRecruitability && (c.recruitability ?? 0) < 80) return false;
+    if (remoteCandidates && !c.location.toLowerCase().includes("remote")) return false;
+    if (jdSkillNames.length > 0) {
+      const candidateSkills = c.skills.map((s) => s.toLowerCase());
+      const hasMatch = jdSkillNames.some((js) => candidateSkills.includes(js));
+      if (!hasMatch) return false;
+    }
+    return true;
+  });
+
+  const displayCandidates = filteredCandidates.map((c, i) => ({
+    rank: i + 1,
+    id: c.id,
+    name: c.name,
+    role: `${c.role} @ ${c.company}`,
+    tech: Math.round(c.technicalFit),
+    recruit: Math.round(c.recruitability),
+    growth: Math.round(c.careerGrowth),
+    success: Math.round(c.successScore),
+  }));
+
+  const totalPages = Math.max(1, Math.ceil(displayCandidates.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedCandidates = displayCandidates.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+  const startRange = (safePage - 1) * PAGE_SIZE + 1;
+  const endRange = Math.min(safePage * PAGE_SIZE, displayCandidates.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [skillMatch, experienceMax, successScore, hiddenGemsOnly, remoteCandidates, highRecruitability]);
 
   return (
     <AppLayout
@@ -58,26 +219,57 @@ export default function CandidateDiscoveryPage() {
           <section className="flex w-full items-center justify-between rounded-xl border border-outline-variant bg-white p-md shadow-sm">
             <div className="flex items-center gap-6">
               <div className="flex flex-col">
-                <span className="text-xs font-bold uppercase tracking-wider text-outline">
-                  Active Job
-                </span>
-                <span className="font-headline-md text-headline-md text-on-surface">
-                  Senior AI Engineer
-                </span>
-              </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-outline">
+                    {jdResult ? "JD Analysis Active" : "Active Job"}
+                  </span>
+                  <span className="font-headline-md text-headline-md text-on-surface">
+                    {jdResult?.role_title ?? (
+                      allCandidates.length > 0
+                        ? allCandidates
+                            .map((c) => c.role)
+                            .sort((a, b) =>
+                              allCandidates.filter((x) => x.role === a).length -
+                              allCandidates.filter((x) => x.role === b).length
+                            )
+                            .pop() ?? "Active Role"
+                        : "Active Role"
+                    )}
+                  </span>
+                  {jdResult && (
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <span className="text-xs text-on-surface-variant">
+                        {jdResult.min_years ?? 0}–{jdResult.max_years ?? "∞"} yrs exp &nbsp;•&nbsp;
+                      </span>
+                      {jdResult.must_have_skills.slice(0, 4).map((s) => (
+                        <span key={s.name} className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                          {s.name}
+                        </span>
+                      ))}
+                      {jdResult.must_have_skills.length > 4 && (
+                        <span className="text-[10px] text-on-surface-variant">+{jdResult.must_have_skills.length - 4} more</span>
+                      )}
+                    </div>
+                  )}
+                </div>
 
               <div className="h-10 w-px bg-outline-variant" />
 
               <div className="flex gap-8">
-                <ContextMetric label="Total Scanned" value="100,000+" />
-                <ContextMetric label="Relevant" value="3,482" />
+                <ContextMetric
+                  label="Total Scanned"
+                  value={loading ? "..." : String(allCandidates.length)}
+                />
+                <ContextMetric
+                  label="Relevant"
+                  value={loading ? "..." : String(filteredCandidates.length)}
+                />
 
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-outline">
                     Ranked Pool
                   </span>
                   <span className="w-fit rounded-full bg-primary-container px-2 py-0.5 text-xs font-bold text-on-primary-container">
-                    Top 100
+                    Top {Math.min(filteredCandidates.length, 100)}
                   </span>
                 </div>
               </div>
@@ -88,7 +280,10 @@ export default function CandidateDiscoveryPage() {
                 Edit Parameters
               </button>
 
-              <button className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-secondary px-4 py-2 font-label-md text-label-md text-white shadow-md transition-all hover:opacity-90">
+              <button
+                onClick={loadCandidates}
+                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-secondary px-4 py-2 font-label-md text-label-md text-white shadow-md transition-all hover:opacity-90"
+              >
                 <span className="material-symbols-outlined text-[18px]">
                   refresh
                 </span>
@@ -192,9 +387,33 @@ export default function CandidateDiscoveryPage() {
                 </h4>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <MiniImpactStat label="Pool Reduced" value="96.5%" />
-                  <MiniImpactStat label="Hidden Gems" value="47" />
-                  <MiniImpactStat label="Avg Fit" value="89%" />
+                  <MiniImpactStat
+                    label="Pool Reduced"
+                    value={
+                      allCandidates.length
+                        ? `${((1 - filteredCandidates.length / allCandidates.length) * 100).toFixed(1)}%`
+                        : "0%"
+                    }
+                  />
+                  <MiniImpactStat
+                    label="Hidden Gems"
+                    value={String(
+                      allCandidates.filter((c) => c.hiddenGem).length
+                    )}
+                  />
+                  <MiniImpactStat
+                    label="Avg Fit"
+                    value={
+                      filteredCandidates.length
+                        ? `${Math.round(
+                            filteredCandidates.reduce(
+                              (s, c) => s + c.skillMatch,
+                              0
+                            ) / filteredCandidates.length
+                          )}%`
+                        : "0%"
+                    }
+                  />
                   <MiniImpactStat label="Time Saved" value="42%" />
                 </div>
               </div>
@@ -223,35 +442,116 @@ export default function CandidateDiscoveryPage() {
                   </thead>
 
                   <tbody className="divide-y divide-outline-variant">
-                    {candidates.map((candidate) => (
-                      <CandidateRow
-                        key={candidate.rank}
-                        candidate={candidate}
-                      />
-                    ))}
-
-                    <SkeletonRow />
+                    {loading ? (
+                      <>
+                        <SkeletonRow />
+                        <SkeletonRow />
+                        <SkeletonRow />
+                      </>
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="material-symbols-outlined text-3xl text-error">
+                              error_outline
+                            </span>
+                            <p className="text-sm font-medium text-error">
+                              Failed to load candidates
+                            </p>
+                            <button
+                              onClick={loadCandidates}
+                              className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : displayCandidates.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="material-symbols-outlined text-3xl text-outline">
+                              search_off
+                            </span>
+                            <p className="text-sm font-medium text-on-surface-variant">
+                              No candidates match your filters
+                            </p>
+                            <button
+                              onClick={clearFilters}
+                              className="rounded-lg bg-surface-container-high px-4 py-2 text-sm font-bold text-primary"
+                            >
+                              Clear Filters
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedCandidates.map((candidate) => (
+                        <CandidateRow
+                          key={candidate.id}
+                          candidate={candidate}
+                        />
+                      ))
+                    )}
                   </tbody>
                 </table>
 
                 <div className="flex items-center justify-between border-t border-outline-variant bg-surface-container-low p-md">
                   <span className="text-xs font-medium text-on-surface-variant">
-                    Displaying 10 of 3,482 relevant matches
+                    Showing {startRange}–{endRange} of {displayCandidates.length.toLocaleString()} relevant matches
                   </span>
 
-                  <div className="flex gap-1">
-                    <PagerIcon icon="chevron_left" />
-                    <button className="rounded border border-outline-variant bg-white px-2 py-1 text-xs font-bold shadow-sm">
-                      1
-                    </button>
-                    <button className="rounded px-2 py-1 text-xs font-medium hover:bg-white">
-                      2
-                    </button>
-                    <button className="rounded px-2 py-1 text-xs font-medium hover:bg-white">
-                      3
-                    </button>
-                    <PagerIcon icon="chevron_right" />
-                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={safePage === 1}
+                        className="rounded p-1 transition-colors hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                      </button>
+
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => {
+                          if (totalPages <= 7) return true;
+                          if (p === 1 || p === totalPages) return true;
+                          if (Math.abs(p - safePage) <= 1) return true;
+                          return false;
+                        })
+                        .reduce((acc, p, idx, arr) => {
+                          if (idx > 0 && p - arr[idx - 1] > 1) {
+                            acc.push(
+                              <span key={`ellipsis-${p}`} className="px-1 text-xs text-on-surface-variant">
+                                ...
+                              </span>
+                            );
+                          }
+                          acc.push(
+                            <button
+                              key={p}
+                              onClick={() => setCurrentPage(p)}
+                              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                                p === safePage
+                                  ? "border border-outline-variant bg-white font-bold shadow-sm"
+                                  : "hover:bg-white"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          );
+                          return acc;
+                        }, [] as React.ReactNode[])}
+
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={safePage === totalPages}
+                        className="rounded p-1 transition-colors hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -332,8 +632,8 @@ export default function CandidateDiscoveryPage() {
                     Market Context
                   </h4>
 
-                  <span className="rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-error-container">
-                    Critical Demand
+                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${marketInsight?.demandTone ?? "bg-surface-container text-on-surface-variant"}`}>
+                    {marketInsight?.demandLabel ?? "Loading..."}
                   </span>
                 </div>
 
@@ -343,7 +643,7 @@ export default function CandidateDiscoveryPage() {
                       Avg. Salary
                     </span>
                     <p className="mt-1 text-lg font-bold text-primary">
-                      $185k - $240k
+                      {marketInsight?.salary ?? "---"}
                     </p>
                   </div>
 
@@ -351,19 +651,19 @@ export default function CandidateDiscoveryPage() {
                     <span className="text-xs text-on-surface-variant">
                       Demand Level
                     </span>
-                    <p className="mt-1 text-lg font-bold text-error">
-                      Critical
+                    <p className={`mt-1 text-lg font-bold ${marketInsight ? (marketInsight.demandLabel.toLowerCase().includes("high") ? "text-error" : marketInsight.demandLabel.toLowerCase().includes("moderate") ? "text-amber-600" : "text-emerald-600") : "text-on-surface-variant"}`}>
+                      {marketInsight?.demandLabel ?? "---"}
                     </p>
                   </div>
 
                   <div>
                     <div className="mb-2 flex justify-between text-xs text-on-surface-variant">
                       <span>Market Pressure</span>
-                      <span className="font-bold text-primary">80%</span>
+                      <span className="font-bold text-primary">{marketInsight?.pressure ?? "---"}%</span>
                     </div>
 
                     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container">
-                      <div className="h-full w-4/5 rounded-full bg-primary" />
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${marketInsight?.pressure ?? 0}%` }} />
                     </div>
                   </div>
                 </div>
@@ -455,9 +755,9 @@ function CandidateRow({
 }: {
   candidate: {
     rank: number;
+    id: string;
     name: string;
     role: string;
-    image: string;
     tech: number;
     recruit: number;
     growth: number;
@@ -481,18 +781,22 @@ function CandidateRow({
 
       <td className="px-4 py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="h-10 w-10 flex-shrink-0 rounded-full border-2 border-primary/20 p-0.5">
-            <img
-              className="h-full w-full rounded-full object-cover"
-              alt={candidate.name}
-              src={candidate.image}
-            />
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-sm font-bold text-primary">
+            {candidate.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
           </div>
 
           <div className="min-w-0">
-            <span className="block truncate text-sm font-bold text-on-surface">
+            <Link
+              to={`/candidate-profile/${candidate.id}`}
+              className="block truncate text-sm font-bold text-on-surface transition-colors hover:text-primary"
+            >
               {candidate.name}
-            </span>
+            </Link>
             <span className="block truncate text-xs text-on-surface-variant">
               {candidate.role}
             </span>
@@ -517,7 +821,7 @@ function CandidateRow({
       <td className="px-4 py-4 text-right">
         <div className="flex justify-end gap-1 opacity-100">
           <Link
-            to="/candidate-profile"
+            to={`/candidate-profile/${candidate.id}`}
             className="rounded-lg p-2 text-primary transition-colors hover:bg-primary/10"
             title="Quick View"
           >
@@ -552,7 +856,7 @@ function SkeletonRow() {
     <tr className="group transition-colors hover:bg-surface-container-lowest">
       <td className="px-4 py-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-sm font-bold text-on-surface-variant/40">
-          #3
+          #--
         </div>
       </td>
 

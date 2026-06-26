@@ -1,6 +1,24 @@
+import logging
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import auth, jobs, candidates, shortlist, dashboard, rank, jd_skills, hidden_gems, explainability, talent_twin, behavioral_signals, market_insight, recruitability, copilot
+
+load_dotenv()
+
+logger = logging.getLogger("uvicorn")
+
+_REQUIRED_ENV_VARS = {
+    "GROQ_API_KEY": "Groq API key for the Copilot/RAG chatbot",
+}
+
+_MISSING_VARS = [k for k, v in _REQUIRED_ENV_VARS.items() if not os.environ.get(k)]
+if _MISSING_VARS:
+    logger.warning(
+        "Missing required env vars: %s. Set them in .env or environment.",
+        ", ".join(f"{k} ({_REQUIRED_ENV_VARS[k]})" for k in _MISSING_VARS),
+    )
 
 app = FastAPI(title="SkillOrbit API", version="1.0.0")
 
@@ -26,6 +44,17 @@ app.include_router(behavioral_signals.router, prefix="/api/behavioral-signals")
 app.include_router(market_insight.router, prefix="/api/market-insight")
 app.include_router(recruitability.router, prefix="/api/recruitability")
 app.include_router(copilot.router, prefix="/api/copilot")
+
+
+@app.on_event("startup")
+async def warm_copilot():
+    logger.info("Warming up copilot (this may take ~60s on first start)...")
+    try:
+        from routes.copilot import get_copilot
+        get_copilot()
+        logger.info("Copilot ready.")
+    except Exception as e:
+        logger.warning("Copilot warm-up failed (will lazy-init on first request): %s", e)
 
 
 @app.get("/api/health")

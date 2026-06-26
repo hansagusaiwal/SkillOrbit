@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
+import pickle
 
 
 class CandidateSuccessModel:
@@ -54,46 +55,6 @@ class CandidateSuccessModel:
         self.scaler = MinMaxScaler()
         self._dim_scalers: dict[str, MinMaxScaler] = {}
         self._trained = False
-
-    # ── Synthetic data generator (replace with real data in production) ──
-
-    @staticmethod
-    def generate_training_data(n: int = 1000, random_state: int = 42) -> pd.DataFrame:
-        np.random.seed(random_state)
-        data = pd.DataFrame({
-            "skills_overlap":          np.random.uniform(0, 1, n),
-            "years_experience":        np.random.uniform(0, 20, n),
-            "company_prestige":        np.random.randint(1, 6, n),
-            "job_hop_freq":            np.random.uniform(0, 3, n),
-            "github_activity":         np.random.uniform(0, 1, n),
-            "open_source_contribs":    np.random.randint(0, 100, n),
-            "leetcode_score":          np.random.uniform(0, 1, n),
-            "education_tier":          np.random.randint(1, 5, n),
-            "certifications_count":    np.random.randint(0, 10, n),
-            "project_complexity":      np.random.uniform(0, 1, n),
-            "tech_stack_diversity":    np.random.uniform(0, 1, n),
-            "endorsements_count":      np.random.randint(0, 200, n),
-            "career_growth_rate":      np.random.uniform(-0.5, 2, n),
-            "response_time_score":     np.random.uniform(0, 1, n),
-        })
-        noise = np.random.normal(0, 8, n)
-        perf = (
-            data["skills_overlap"]       * 25
-            + data["years_experience"]    * 1.5
-            + data["company_prestige"]    * 3
-            + data["github_activity"]     * 10
-            + data["leetcode_score"]      * 8
-            + data["career_growth_rate"]  * 5
-            + data["project_complexity"]  * 7
-            + data["tech_stack_diversity"] * 6
-            + data["education_tier"]      * 2
-            + noise
-        )
-        perf = np.clip(perf, 0, None)
-        data["performance_score"] = (
-            (perf - perf.min()) / (perf.max() - perf.min()) * 100
-        )
-        return data
 
     # ── Training ──
 
@@ -172,4 +133,16 @@ class CandidateSuccessModel:
 
     @staticmethod
     def load(path: str = "ml/candidate_success_model.pkl"):
-        return joblib.load(path)
+        class _CustomUnpickler(pickle.Unpickler):
+            def find_class(self, module, name):
+                if module == "model":
+                    module = "ml.model"
+                return super().find_class(module, name)
+
+        try:
+            return joblib.load(path)
+        except ModuleNotFoundError as e:
+            if "No module named 'model'" in str(e):
+                with open(path, "rb") as f:
+                    return _CustomUnpickler(f).load()
+            raise

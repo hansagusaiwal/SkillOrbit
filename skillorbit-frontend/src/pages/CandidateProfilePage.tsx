@@ -1,73 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
-import { explainCandidate, analyzeBehavioralSignals } from "../api";
-
-const scoreCards = [
-  {
-    label: "Technical Fit",
-    value: "92%",
-    icon: "trending_up",
-    iconClass: "text-emerald-500",
-  },
-  {
-    label: "Skill Match",
-    value: "89%",
-    icon: "verified",
-    iconClass: "text-emerald-500",
-  },
-  {
-    label: "Experience",
-    value: "87%",
-    icon: "check_circle",
-    iconClass: "text-amber-500",
-  },
-  {
-    label: "Recruitability",
-    value: "91%",
-    icon: "bolt",
-    iconClass: "text-emerald-500",
-  },
-  {
-    label: "Career Growth",
-    value: "88%",
-    icon: "auto_graph",
-    iconClass: "text-emerald-500",
-  },
-];
-
-const skills = [
-  {
-    label: "Python",
-    className: "bg-primary/10 text-primary border-primary/20",
-  },
-  {
-    label: "PyTorch",
-    className: "bg-primary/10 text-primary border-primary/20",
-  },
-  {
-    label: "TensorFlow",
-    className: "bg-primary/10 text-primary border-primary/20",
-  },
-  {
-    label: "AWS",
-    className: "bg-secondary-container/10 text-secondary border-secondary/20",
-  },
-  {
-    label: "Kubernetes",
-    className: "bg-secondary-container/10 text-secondary border-secondary/20",
-  },
-  {
-    label: "Distributed Systems",
-    className:
-      "bg-surface-container text-on-surface-variant border-outline-variant",
-  },
-  {
-    label: "CI/CD",
-    className:
-      "bg-surface-container text-on-surface-variant border-outline-variant",
-  },
-];
+import { fetchCandidate, explainCandidate, analyzeBehavioralSignals } from "../api";
+import type { Candidate } from "../types";
 
 const BEHAVIORAL_LABELS: Record<string, string> = {
   collaboration: "Collaboration",
@@ -78,31 +13,119 @@ const BEHAVIORAL_LABELS: Record<string, string> = {
   initiative: "Initiative",
 };
 
-const defaultCandidateFeatures: Record<string, number> = {
-  skills_overlap: 0.92, years_experience: 7.2, company_prestige: 4,
-  job_hop_freq: 2.8, github_activity: 0.85, open_source_contribs: 42,
-  leetcode_score: 0.88, education_tier: 3, certifications_count: 4,
-  project_complexity: 0.85, tech_stack_diversity: 0.78,
-  endorsements_count: 156, career_growth_rate: 1.2, response_time_score: 0.82,
-};
+const SCORE_CARD_CONFIG: { key: keyof Candidate; label: string; icon: string; iconClass: string }[] = [
+  { key: "technicalFit", label: "Technical Fit", icon: "trending_up", iconClass: "text-emerald-500" },
+  { key: "skillMatch", label: "Skill Match", icon: "verified", iconClass: "text-emerald-500" },
+  { key: "experienceMatch", label: "Experience", icon: "check_circle", iconClass: "text-amber-500" },
+  { key: "recruitability", label: "Recruitability", icon: "bolt", iconClass: "text-emerald-500" },
+  { key: "careerGrowth", label: "Career Growth", icon: "auto_graph", iconClass: "text-emerald-500" },
+];
+
+const SKILL_CLASSES = [
+  "bg-primary/10 text-primary border-primary/20",
+  "bg-secondary-container/10 text-secondary border-secondary/20",
+  "bg-surface-container text-on-surface-variant border-outline-variant",
+];
+
+const FEATURE_KEYS: (keyof Candidate)[] = [
+  "skills_overlap", "years_experience", "company_prestige",
+  "job_hop_freq", "github_activity", "open_source_contribs",
+  "leetcode_score", "education_tier", "certifications_count",
+  "project_complexity", "tech_stack_diversity", "endorsements_count",
+  "career_growth_rate", "response_time_score",
+];
+
+function buildFeatures(candidate: Candidate): Record<string, number> {
+  const features: Record<string, number> = {};
+  for (const key of FEATURE_KEYS) {
+    features[key] = candidate[key] as number;
+  }
+  return features;
+}
+
+function successTone(score: number): string {
+  if (score >= 90) return "Ultra-High Potential";
+  if (score >= 75) return "High Potential";
+  if (score >= 60) return "Moderate Potential";
+  return "Developing";
+}
+
+function successColor(score: number): string {
+  if (score >= 90) return "text-emerald-600";
+  if (score >= 75) return "text-blue-600";
+  if (score >= 60) return "text-amber-600";
+  return "text-slate-600";
+}
 
 export default function CandidateProfilePage() {
   const navigate = useNavigate();
   const { candidateId } = useParams();
+  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [explanation, setExplanation] = useState<Awaited<ReturnType<typeof explainCandidate>> | null>(null);
   const [explainLoading, setExplainLoading] = useState(true);
   const [behavioral, setBehavioral] = useState<Awaited<ReturnType<typeof analyzeBehavioralSignals>> | null>(null);
 
   useEffect(() => {
-    explainCandidate(defaultCandidateFeatures, 5)
-      .then(setExplanation)
-      .catch(() => setExplanation(null))
-      .finally(() => setExplainLoading(false));
+    if (!candidateId) {
+      setLoading(false);
+      setError(true);
+      return;
+    }
 
-    analyzeBehavioralSignals(candidateId ?? "CAND-0000")
-      .then(setBehavioral)
-      .catch(() => setBehavioral(null));
+    setLoading(true);
+    setError(false);
+    setExplanation(null);
+    setBehavioral(null);
+    setExplainLoading(true);
+
+    fetchCandidate(candidateId)
+      .then((data) => {
+        setCandidate(data);
+
+        const features = buildFeatures(data);
+        explainCandidate(features, 5)
+          .then(setExplanation)
+          .catch(() => setExplanation(null))
+          .finally(() => setExplainLoading(false));
+
+        analyzeBehavioralSignals(candidateId)
+          .then(setBehavioral)
+          .catch(() => setBehavioral(null));
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, [candidateId]);
+
+  if (loading) {
+    return (
+      <AppLayout title="Candidate Profile" searchPlaceholder="Search candidates, skills, or insights...">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <span className="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error || !candidate) {
+    return (
+      <AppLayout title="Candidate Profile" searchPlaceholder="Search candidates, skills, or insights...">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <span className="material-symbols-outlined text-5xl text-error">error_outline</span>
+          <p className="text-lg font-medium text-error">
+            {candidateId ? "Failed to load candidate" : "No candidate ID provided"}
+          </p>
+          <button
+            onClick={() => navigate("/candidate-discovery")}
+            className="rounded-lg bg-primary px-6 py-2 font-bold text-white"
+          >
+            Back to Discovery
+          </button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout
@@ -114,11 +137,14 @@ export default function CandidateProfilePage() {
         <section className="relative mb-lg flex flex-col items-start justify-between gap-lg overflow-hidden rounded-2xl border border-outline-variant bg-white p-xl shadow-sm md:flex-row md:items-center">
           <div className="relative z-10 flex items-center gap-xl">
             <div className="relative">
-              <img
-                className="h-32 w-32 rounded-2xl object-cover ring-4 ring-primary-fixed"
-                alt="Aarav Mehta"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuApzyhL9ESYJsonGRDUkMuY1W2cYNyfNjYSr72qjQxYyvHHbBEEYCkZK9bJwBWEhqpBAE98muERP0LqIsWHQO4yMnftMUYcqqaj9OG9YvAO9Z9rE651wnzZFvfMmx5cPauaCAcKrSZx2OSSaVz1tfEChx2Runhdb6XuO_ckb_6MWjtV9TVpGZECGIrtwnvg584OZQH3_E2YQHNMkJxBBe3fMP7PAajjC8tt7Qfujm-czrs4e0iV5516fOj5Tcny6lCQmkRT9rR-4XGI"
-              />
+              <div className="flex h-32 w-32 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-4xl font-bold text-white ring-4 ring-primary-fixed">
+                {candidate.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </div>
 
               <div className="absolute -bottom-2 -right-2 flex items-center justify-center rounded-lg border-2 border-white bg-emerald-500 p-1 text-white">
                 <span
@@ -132,18 +158,18 @@ export default function CandidateProfilePage() {
 
             <div>
               <h2 className="font-headline-lg text-headline-lg text-on-surface">
-                Aarav Mehta
+                {candidate.name}
               </h2>
 
-              <div className="mt-1 flex items-center gap-3">
+              <div className="mt-1 flex items-center gap-3 flex-wrap">
                 <span className="font-semibold text-primary">
-                  Senior ML Engineer
+                  {candidate.role}
                 </span>
                 <span className="h-1.5 w-1.5 rounded-full bg-outline-variant" />
-                <span className="text-on-surface-variant">7.2 yrs exp</span>
+                <span className="text-on-surface-variant">{candidate.experience} exp</span>
                 <span className="h-1.5 w-1.5 rounded-full bg-outline-variant" />
                 <span className="text-on-surface-variant">
-                  San Francisco, CA
+                  {candidate.location}
                 </span>
               </div>
 
@@ -195,7 +221,7 @@ export default function CandidateProfilePage() {
                   r="40"
                   stroke="currentColor"
                   strokeDasharray="251.2"
-                  strokeDashoffset="20.1"
+                  strokeDashoffset={String(251.2 - (251.2 * candidate.successScore) / 100)}
                   strokeLinecap="round"
                   strokeWidth="8"
                   style={{
@@ -206,12 +232,12 @@ export default function CandidateProfilePage() {
               </svg>
 
               <span className="absolute text-2xl font-bold text-on-surface">
-                92%
+                {Math.round(candidate.successScore)}%
               </span>
             </div>
 
-            <span className="text-sm font-bold text-emerald-600">
-              Ultra-High Potential
+            <span className={`text-sm font-bold ${successColor(candidate.successScore)}`}>
+              {successTone(candidate.successScore)}
             </span>
           </div>
         </section>
@@ -221,9 +247,15 @@ export default function CandidateProfilePage() {
           {/* Left Column */}
           <div className="col-span-12 flex flex-col gap-lg lg:col-span-8">
             {/* Score Cards */}
-            <div className="grid grid-cols-2 gap-md md:grid-cols-3 xl:grid-cols-4">
-              {scoreCards.map((card) => (
-                <ScoreCard key={card.label} {...card} />
+            <div className="grid grid-cols-2 gap-md md:grid-cols-3 xl:grid-cols-5">
+              {SCORE_CARD_CONFIG.map((card) => (
+                <ScoreCard
+                  key={card.key}
+                  label={card.label}
+                  value={`${Math.round(candidate[card.key] as number)}%`}
+                  icon={card.icon}
+                  iconClass={card.iconClass}
+                />
               ))}
             </div>
 
@@ -240,14 +272,18 @@ export default function CandidateProfilePage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {skills.map((skill) => (
-                    <span
-                      key={skill.label}
-                      className={`rounded-lg border px-3 py-1.5 font-label-md ${skill.className}`}
-                    >
-                      {skill.label}
-                    </span>
-                  ))}
+                  {candidate.skills.length > 0 ? (
+                    candidate.skills.map((skill, i) => (
+                      <span
+                        key={skill}
+                        className={`rounded-lg border px-3 py-1.5 font-label-md ${SKILL_CLASSES[i % SKILL_CLASSES.length]}`}
+                      >
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <p className="text-sm text-on-surface-variant">No skills listed</p>
+                  )}
                 </div>
               </div>
 
@@ -282,18 +318,10 @@ export default function CandidateProfilePage() {
               <div className="relative space-y-8 before:absolute before:bottom-2 before:left-[11px] before:top-2 before:w-[2px] before:bg-outline-variant">
                 <TimelineItem
                   borderClass="border-primary"
-                  title="Senior Machine Learning Engineer"
-                  company="TechFlow Systems"
-                  date="2021 — Present"
-                  description="Leading the core personalization engine team. Architected a distributed training pipeline that reduced model latency by 40%. Scaled production ML deployments to handle 10k+ requests per second using Kubernetes and AWS."
-                />
-
-                <TimelineItem
-                  borderClass="border-secondary"
-                  title="ML Research Associate"
-                  company="AI Labs Global"
-                  date="2018 — 2021"
-                  description="Published 3 papers on Computer Vision optimizations. Developed proprietary NLP preprocessing libraries used across the entire research division. Mentored 4 junior researchers in PyTorch best practices."
+                  title={candidate.role}
+                  company={candidate.company}
+                  date="—"
+                  description={candidate.reason || "Experienced professional with a strong track record."}
                 />
               </div>
             </div>
@@ -346,7 +374,7 @@ export default function CandidateProfilePage() {
                 </>
               ) : (
                 <p className="text-sm text-on-surface-variant">
-                  Unable to load SHAP explanation. Ensure the backend is running.
+                  Unable to load SHAP explanation.
                 </p>
               )}
             </div>
@@ -359,9 +387,7 @@ export default function CandidateProfilePage() {
 
               <div className="flex flex-col gap-3 rounded-xl bg-surface-container p-4">
                 <p className="text-xs italic text-on-surface-variant">
-                  &quot;Aarav&apos;s technical depth is clear. Focus your 1-on-1
-                  on his leadership style within TechFlow&apos;s recent team
-                  restructure.&quot;
+                  &quot;{candidate.name}&apos;s profile shows strong alignment with the role. Focus on {candidate.skills.slice(0, 3).join(", ")} experience during the interview.&quot;
                 </p>
 
                 <div className="flex flex-col gap-2">
@@ -373,8 +399,7 @@ export default function CandidateProfilePage() {
                   </div>
 
                   <p className="text-body-sm text-on-surface-variant">
-                    How did you manage technical debt while scaling the
-                    personalization engine to 10k RPS?
+                    Can you walk us through a challenging project where you applied your {candidate.skills[0] || "technical"} skills to solve a complex problem?
                   </p>
                 </div>
               </div>
@@ -399,7 +424,7 @@ export default function CandidateProfilePage() {
                       Location Signal
                     </p>
                     <p className="mt-1 text-lg font-bold text-on-surface">
-                      SF Bay Area
+                      {candidate.location}
                     </p>
                   </div>
 
@@ -438,7 +463,7 @@ export default function CandidateProfilePage() {
                     Current Location
                   </p>
                   <p className="mt-1 font-bold text-on-surface">
-                    San Francisco, CA
+                    {candidate.location}
                   </p>
                 </div>
 
@@ -544,5 +569,3 @@ function TimelineItem({
     </div>
   );
 }
-
-

@@ -63,3 +63,10 @@ instance/
 
 # ML experiment tracking
 mlruns/
+
+# Server output logs
+skillorbit-backend/stderr*.txt
+skillorbit-backend/stdout*.txt
+
+# Large dataset files
+skillorbit-backend/data/

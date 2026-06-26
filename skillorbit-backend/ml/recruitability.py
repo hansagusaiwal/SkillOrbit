@@ -50,28 +50,97 @@ FEATURE_LABELS = {
 }
 
 
+def recruitability_features_from_real(candidate: dict) -> dict:
+    """Map real candidate data to the 17 recruitability feature columns."""
+    from datetime import datetime
+    p = candidate.get("profile", {})
+    ch = candidate.get("career_history", [])
+    signals = candidate.get("redrob_signals", {})
+
+    current_company = p.get("current_company", "")
+    months_current = 0
+    for entry in ch:
+        if entry.get("is_current"):
+            months_current = entry.get("duration_months", 0)
+            break
+
+    gh_raw = signals.get("github_activity_score", -1)
+    gh_commits = int((gh_raw / 100) * 40) if gh_raw != -1 else 2
+
+    views = signals.get("profile_views_received_30d", 0)
+    resp_rate = signals.get("recruiter_response_rate", 0.5)
+
+    search_app = signals.get("search_appearance_30d", 0)
+    app_count = signals.get("applications_submitted_30d", 0)
+    interviews = signals.get("interview_completion_rate", 0.5)
+
+    completeness = signals.get("profile_completeness_score", 50) / 100.0
+    open_to_work = 1 if signals.get("open_to_work_flag") else 0
+
+    salary = signals.get("expected_salary_range_inr_lpa", {}) or {}
+    below_market = 0.0
+    min_sal = salary.get("min", 0)
+    max_sal = salary.get("max", 0)
+
+    assessment_scores = signals.get("skill_assessment_scores", {}) or {}
+    so_score = (
+        sum(assessment_scores.values()) / len(assessment_scores) / 100.0
+        if assessment_scores
+        else 0.3
+    )
+
+    if len(ch) >= 2:
+        prev = ch[-1]
+        curr = ch[0]
+        gap_months = 0
+        if not prev.get("is_current") and prev.get("end_date"):
+            from datetime import datetime
+            try:
+                end = datetime.strptime(prev["end_date"], "%Y-%m-%d")
+                start = datetime.strptime(curr.get("start_date", "2020-01-01"), "%Y-%m-%d")
+                gap_months = max(0, (start.year - end.year) * 12 + start.month - end.month)
+            except Exception:
+                gap_months = 0
+        no_promo = months_current
+    else:
+        no_promo = months_current
+
+    return {
+        "months_at_current_company": months_current,
+        "total_yoe": p.get("years_of_experience", 0),
+        "num_companies": len(ch),
+        "avg_tenure_months": np.mean([e["duration_months"] for e in ch]) if ch else 0,
+        "github_commits_last_30d": gh_commits,
+        "linkedin_profile_views_30d": views,
+        "linkedin_updated_days_ago": 30,
+        "stackoverflow_activity_score": round(so_score, 3),
+        "recruiter_response_time_hrs": signals.get("avg_response_time_hours", 100),
+        "opened_recruiter_emails": min(int(resp_rate * 5), 5),
+        "clicked_job_links": min(int(search_app / 50), 4),
+        "profile_completeness": round(completeness, 3),
+        "open_to_work_flag": open_to_work,
+        "applied_other_jobs_30d": app_count,
+        "attended_career_event": 1 if interviews > 0.6 else 0,
+        "below_market_salary_pct": round(below_market, 1),
+        "no_promotion_months": no_promo,
+    }
+
+
 def generate_recruitability_data(n: int = 3000, seed: int = 42) -> pd.DataFrame:
+    """Build recruitability training data from real candidate records."""
     np.random.seed(seed)
-    df = pd.DataFrame({
-        "candidate_id": [f"CAND-{i:05d}" for i in range(n)],
-        "months_at_current_company": np.random.exponential(24, n).clip(1, 120),
-        "total_yoe":                 np.random.uniform(1, 18, n),
-        "num_companies":             np.random.randint(1, 8, n).astype(float),
-        "avg_tenure_months":         np.random.uniform(8, 60, n),
-        "github_commits_last_30d":   np.random.poisson(12, n).astype(float),
-        "linkedin_profile_views_30d": np.random.poisson(8, n).astype(float),
-        "linkedin_updated_days_ago": np.random.exponential(90, n).clip(1, 730),
-        "stackoverflow_activity_score": np.random.uniform(0, 1, n),
-        "recruiter_response_time_hrs": np.random.exponential(48, n).clip(0.5, 720),
-        "opened_recruiter_emails":     np.random.randint(0, 6, n).astype(float),
-        "clicked_job_links":           np.random.randint(0, 4, n).astype(float),
-        "profile_completeness":        np.random.uniform(0.4, 1.0, n),
-        "open_to_work_flag":           np.random.choice([0, 1], n, p=[0.80, 0.20]).astype(float),
-        "applied_other_jobs_30d":      np.random.randint(0, 5, n).astype(float),
-        "attended_career_event":       np.random.choice([0, 1], n, p=[0.85, 0.15]).astype(float),
-        "below_market_salary_pct":    np.random.uniform(-10, 40, n),
-        "no_promotion_months":        np.random.exponential(18, n).clip(0, 60),
-    })
+
+    from data import raw_candidates, get_nested_raw
+    rows = []
+    for i, c in enumerate(raw_candidates):
+        if i >= n:
+            break
+        raw_nested = get_nested_raw(c["id"])
+        row = recruitability_features_from_real(raw_nested or c)
+        row["candidate_id"] = c["id"]
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
 
     log_odds = (
         -2.0
@@ -88,10 +157,10 @@ def generate_recruitability_data(n: int = 3000, seed: int = 42) -> pd.DataFrame:
         + 0.5  * df["profile_completeness"]
         + 0.03 * df["below_market_salary_pct"].clip(0, 40)
         + 0.02 * df["no_promotion_months"].clip(0, 36)
-        + np.random.normal(0, 0.5, n)
+        + np.random.normal(0, 0.5, len(df))
     )
     prob = 1 / (1 + np.exp(-log_odds))
-    df["is_recruitable"] = (np.random.uniform(0, 1, n) < prob).astype(int)
+    df["is_recruitable"] = (np.random.uniform(0, 1, len(df)) < prob).astype(int)
     return df.round(3)
 
 

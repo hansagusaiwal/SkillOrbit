@@ -98,61 +98,45 @@ class CandidateSignals:
 
 
 def generate_candidate_signals(n: int = 5, seed: int = 42) -> list[CandidateSignals]:
-    np.random.seed(seed)
-
-    commit_pool = [
-        "Fix race condition in distributed lock manager after root cause analysis",
-        "Refactor auth module — reduce latency by 40ms end-to-end",
-        "Add unit tests for payment service; document edge cases in README",
-        "Pair programmed with @alice on new onboarding flow, cleaned up PR feedback",
-        "Learned Ray for distributed training, implemented toy example",
-        "Open PR to upstream repo fixing memory leak in data loader",
-        "Led design discussion for new event-driven architecture",
-        "Debugged prod issue: traced null pointer to stale cache, resolved in 2hrs",
-        "Explored LLM fine-tuning; wrote internal blog post on findings",
-        "Self-taught Rust over weekend, built CLI tool for log parsing",
-        "Proposed and shipped new feature: async job queue from scratch",
-        "Code review for 3 PRs; left detailed inline comments",
-        "Optimized SQL query reducing runtime from 45s to 0.3s",
-        "Documented API contract in OpenAPI spec, shared with team",
-        "Contributed to OSS: merged PR in HuggingFace transformers repo",
-        "Mentored junior engineer through their first production deployment",
-        "Filed issue with repro steps on upstream library, received fix quickly",
-        "Wrote ADR for migration from REST to gRPC after benchmarking",
-    ]
-
-    linkedin_pool = [
-        "Passionate about building robust systems and mentoring teams.",
-        "I love learning new technologies and contributing to open source.",
-        "Led multiple cross-functional initiatives at scale.",
-        "Driven by solving hard problems end-to-end with ownership.",
-        "Strong communicator, enjoy writing design docs and RFCs.",
-    ]
+    """Build candidate signals from real candidate profile summaries and career descriptions."""
+    from data import raw_candidates, get_nested_raw
 
     signals = []
-    for i in range(n):
-        n_commits = np.random.randint(8, 18)
+    for i, c in enumerate(raw_candidates):
+        if len(signals) >= n:
+            break
+        raw = get_nested_raw(c["id"])
+        if not raw:
+            continue
+
+        p = raw.get("profile", {})
+        ch = raw.get("career_history", [])
+        s = raw.get("skills", [])
+        signals_obj = raw.get("redrob_signals", {})
+
+        texts = []
+        if p.get("summary"):
+            texts.append(p["summary"])
+        for entry in ch:
+            if entry.get("description"):
+                texts.append(entry["description"])
+
+        if not texts:
+            texts.append(f"{p.get('headline', '')} | Location: {p.get('location', '')}")
+
         signals.append(CandidateSignals(
-            candidate_id=f"CAND-{i:04d}",
-            github_commits=list(np.random.choice(commit_pool, n_commits, replace=True)),
-            github_pr_bodies=list(np.random.choice(commit_pool, np.random.randint(3, 8), replace=True)),
-            github_repo_readmes=[
-                "This project demonstrates distributed systems concepts. "
-                "Collaborated with 3 engineers. Documented setup steps thoroughly.",
-                "A self-taught exploration of MLOps pipelines. Learned Kubernetes for this.",
-            ],
-            stackoverflow_answers=list(np.random.choice(commit_pool, np.random.randint(2, 5), replace=True)),
-            linkedin_about=np.random.choice(linkedin_pool),
-            linkedin_endorsements=list(np.random.choice(
-                ["Python", "Machine Learning", "Leadership", "Team Building",
-                 "Problem Solving", "Communication", "Mentoring"],
-                np.random.randint(3, 7), replace=False
-            )),
-            repos_contributed_to=np.random.randint(2, 30),
-            avg_pr_review_time_hrs=np.random.uniform(1, 72),
-            issues_opened=np.random.randint(0, 40),
-            issues_closed=np.random.randint(0, 35),
-            stars_received=np.random.randint(0, 500),
+            candidate_id=c["id"],
+            github_commits=texts,
+            github_pr_bodies=texts[:3],
+            github_repo_readmes=texts[:2],
+            stackoverflow_answers=texts[:3],
+            linkedin_about=p.get("summary", p.get("headline", "")),
+            linkedin_endorsements=[s["name"] for s in s[:5]],
+            repos_contributed_to=min(int(signals_obj.get("github_activity_score", 0)), 30),
+            avg_pr_review_time_hrs=signals_obj.get("avg_response_time_hours", 48),
+            issues_opened=signals_obj.get("profile_views_received_30d", 0),
+            issues_closed=signals_obj.get("applications_submitted_30d", 0),
+            stars_received=signals_obj.get("saved_by_recruiters_30d", 0) * 10,
         ))
     return signals
 

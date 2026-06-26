@@ -49,43 +49,65 @@ COMPANIES = [
 ]
 
 
-def generate_candidate_pool(n: int = 2000, seed: int = 42) -> pd.DataFrame:
-    np.random.seed(seed)
-    clusters = list(SKILL_CLUSTERS.keys())
+def _map_to_cluster(skills: list[str]) -> str:
+    skill_lower = [s.lower() for s in skills]
+    for cluster, keywords in SKILL_CLUSTERS.items():
+        if any(kw.lower() in skill_lower for kw in keywords):
+            return cluster
+    if any(s in skill_lower for s in ["python", "java", "javascript", "typescript", "go", "rust"]):
+        return "Backend Engineering"
+    return "ML / AI Engineering"
 
-    location_weights = {
-        "San Francisco": 0.20, "New York": 0.15, "Seattle": 0.12,
-        "Austin": 0.08, "Boston": 0.07, "London": 0.12,
-        "Berlin": 0.06, "Bangalore": 0.10, "Toronto": 0.06, "Singapore": 0.04,
-    }
-    cluster_weights = {
-        "ML / AI Engineering":  0.22, "Data Engineering": 0.18,
-        "Backend Engineering":  0.20, "Frontend Engineering": 0.15,
-        "Platform / DevOps":    0.10, "Data Science": 0.10,
-        "Security Engineering": 0.05,
-    }
+
+def _map_location(loc: str) -> str:
+    loc_lower = loc.lower()
+    if "bangalore" in loc_lower or "bengaluru" in loc_lower or "pune" in loc_lower or "hyderabad" in loc_lower or "chennai" in loc_lower:
+        return "Bangalore"
+    if "mumbai" in loc_lower or "delhi" in loc_lower or "gurgaon" in loc_lower or "noida" in loc_lower:
+        return "Bangalore"
+    if "san francisco" in loc_lower or "bay area" in loc_lower:
+        return "San Francisco"
+    if "new york" in loc_lower or "nyc" in loc_lower:
+        return "New York"
+    if "seattle" in loc_lower:
+        return "Seattle"
+    if "london" in loc_lower:
+        return "London"
+    if "berlin" in loc_lower:
+        return "Berlin"
+    if "toronto" in loc_lower:
+        return "Toronto"
+    if "singapore" in loc_lower:
+        return "Singapore"
+    if "austin" in loc_lower:
+        return "Austin"
+    if "boston" in loc_lower:
+        return "Boston"
+    return "Bangalore"
+
+
+def generate_candidate_pool(n: int = 2000, seed: int = 42) -> pd.DataFrame:
+    from data import raw_candidates
 
     rows = []
-    for i in range(n):
-        loc     = np.random.choice(list(location_weights.keys()),
-                                   p=list(location_weights.values()))
-        cluster = np.random.choice(list(cluster_weights.keys()),
-                                   p=list(cluster_weights.values()))
+    for c in raw_candidates:
+        if len(rows) >= n:
+            break
+        cluster = _map_to_cluster(c.get("skills", []))
+        loc = _map_location(c.get("location", ""))
+        yoe = c.get("years_experience", 0)
         rows.append({
-            "candidate_id":   f"CAND-{i:04d}",
-            "location":       loc,
-            "skill_cluster":  cluster,
-            "years_exp":      round(np.random.uniform(1, 15), 1),
-            "is_open_to_work": np.random.choice([True, False], p=[0.35, 0.65]),
-            "joined_month":   np.random.randint(1, 13),
+            "candidate_id": c["id"],
+            "location": loc,
+            "skill_cluster": cluster,
+            "years_exp": yoe,
+            "is_open_to_work": bool(c.get("hiddenGem", False)),
+            "joined_month": 1,
         })
     return pd.DataFrame(rows)
 
 
 def generate_job_postings(n: int = 800, seed: int = 7) -> pd.DataFrame:
-    np.random.seed(seed)
-    clusters = list(SKILL_CLUSTERS.keys())
-
     demand_cluster_weights = {
         "ML / AI Engineering":  0.30,
         "Data Engineering":     0.20,
@@ -101,6 +123,7 @@ def generate_job_postings(n: int = 800, seed: int = 7) -> pd.DataFrame:
         "Berlin": 0.04, "Bangalore": 0.04, "Toronto": 0.04, "Singapore": 0.03,
     }
 
+    np.random.seed(seed)
     rows = []
     for i in range(n):
         loc     = np.random.choice(list(demand_location_weights.keys()),

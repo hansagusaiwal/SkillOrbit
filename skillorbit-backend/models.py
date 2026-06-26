@@ -19,6 +19,21 @@ class Candidate(BaseModel):
     hiddenGem: Optional[bool] = None
     skills: list[str] = []
     reason: str = ""
+    # ML feature fields (used by SHAP explainability, benchmarking, etc.)
+    skills_overlap: float = 0
+    years_experience: float = 0
+    company_prestige: float = 0
+    job_hop_freq: float = 0
+    github_activity: float = 0
+    open_source_contribs: float = 0
+    leetcode_score: float = 0
+    education_tier: float = 0
+    certifications_count: float = 0
+    project_complexity: float = 0
+    tech_stack_diversity: float = 0
+    endorsements_count: float = 0
+    career_growth_rate: float = 0
+    response_time_score: float = 0
 
 
 class Job(BaseModel):
@@ -27,6 +42,7 @@ class Job(BaseModel):
     roleCategory: str
     location: str
     experienceRange: str
+    description: str = ""
     status: str
     candidatesScanned: int
     topScore: int
@@ -42,12 +58,27 @@ class ShortlistItem(BaseModel):
     reason: str
 
 
+class QualityDistributionItem(BaseModel):
+    label: str
+    indexed: float
+    benchmarked: float
+
+
+class DonutSegment(BaseModel):
+    label: str
+    value: float
+    color: str
+
+
 class DashboardStats(BaseModel):
     totalCandidatesIndexed: int
     activeJobs: int
     rankedShortlists: int
     avgSuccessScore: float
     hiddenGemsFound: int
+    candidateQualityDistribution: list[QualityDistributionItem] = []
+    talentPoolByRole: list[DonutSegment] = []
+    insight: str = ""
 
 
 class LoginRequest(BaseModel):
@@ -65,6 +96,8 @@ class JobCreate(BaseModel):
     roleCategory: str = "Engineering"
     location: str = "Remote"
     experienceRange: str = "3-5 years"
+    description: str = ""
+    status: str = "Active"
 
 
 class RankRequest(BaseModel):
