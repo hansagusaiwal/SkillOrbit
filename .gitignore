@@ -72,3 +72,4 @@ skillorbit-backend/stdout*.txt
 
 # Large dataset files
 skillorbit-backend/data/
+skillorbit-backend/data/candidates.jsonl
