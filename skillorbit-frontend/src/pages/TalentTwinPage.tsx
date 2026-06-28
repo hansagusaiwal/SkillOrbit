@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import {
-  fetchCandidates, fetchCandidate,
+  fetchCandidates,
   compareCandidates, classifyCandidate, findTalentTwins,
 } from "../api";
 import type { Candidate } from "../types";
@@ -32,8 +32,7 @@ export default function TalentTwinPage() {
 
   const [candidateA, setCandidateA] = useState<Candidate | null>(null);
   const [candidateB, setCandidateB] = useState<Candidate | null>(null);
-  const [loadingA, setLoadingA] = useState(false);
-  const [loadingB, setLoadingB] = useState(false);
+
 
   const [comparison, setComparison] = useState<Awaited<ReturnType<typeof compareCandidates>> | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);

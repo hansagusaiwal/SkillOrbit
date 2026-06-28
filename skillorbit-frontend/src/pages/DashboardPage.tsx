@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import { fetchDashboardStats, fetchRecentJobs, activateJob } from "../api";
@@ -333,7 +333,7 @@ export default function DashboardPage() {
                           );
                           return acc;
                         },
-                        { offset: 0, elements: [] as JSX.Element[] }
+                        { offset: 0, elements: [] as React.JSX.Element[] }
                       ).elements}
                     </svg>
 

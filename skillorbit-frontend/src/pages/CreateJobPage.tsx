@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import AppLayout from "../components/layout/AppLayout";
-import { createJob, extractJDSkills, getMarketInsight, getMarketOptions } from "../api";
+import { createJob, extractJDSkills, getMarketInsight } from "../api";
 
 const ROLE_CATEGORIES = [
   "Engineering",
@@ -49,7 +49,7 @@ export default function CreateJobPage() {
 
   const [extractedSkills, setExtractedSkills] = useState<string[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
-  const extractTimer = useRef<ReturnType<typeof setTimeout>>();
+  const extractTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [marketData, setMarketData] = useState<{
     densityLabel: string;
@@ -61,7 +61,7 @@ export default function CreateJobPage() {
     insightText: string;
   } | null>(null);
   const [marketLoading, setMarketLoading] = useState(false);
-  const marketTimer = useRef<ReturnType<typeof setTimeout>>();
+  const marketTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (description.trim().length < 20) {

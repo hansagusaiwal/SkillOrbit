@@ -884,13 +884,6 @@ function SkeletonRow() {
   );
 }
 
-function PagerIcon({ icon }: { icon: string }) {
-  return (
-    <button className="rounded p-1 transition-colors hover:bg-white">
-      <span className="material-symbols-outlined text-[20px]">{icon}</span>
-    </button>
-  );
-}
 
 function RankingLogicCard({ title, text }: { title: string; text: string }) {
   return (
