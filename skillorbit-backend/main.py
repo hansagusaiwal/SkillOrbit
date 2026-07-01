@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from dotenv import load_dotenv
@@ -48,13 +49,15 @@ app.include_router(copilot.router, prefix="/api/copilot")
 
 @app.on_event("startup")
 async def warm_copilot():
-    logger.info("Warming up copilot (this may take ~60s on first start)...")
-    try:
-        from routes.copilot import get_copilot
-        get_copilot()
-        logger.info("Copilot ready.")
-    except Exception as e:
-        logger.warning("Copilot warm-up failed (will lazy-init on first request): %s", e)
+    logger.info("Scheduling copilot warm-up in background...")
+    async def _warm():
+        try:
+            from routes.copilot import get_copilot
+            get_copilot()
+            logger.info("Copilot ready.")
+        except Exception as e:
+            logger.warning("Copilot warm-up failed (will lazy-init on first request): %s", e)
+    asyncio.ensure_future(_warm())
 
 
 @app.get("/api/health")
