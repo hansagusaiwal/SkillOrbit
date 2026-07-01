@@ -151,14 +151,22 @@ def load_candidates(path: str | None = None) -> list[dict]:
         return []
 
     flat_candidates = []
+    skipped = 0
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            raw = json.loads(line)
+            try:
+                raw = json.loads(line)
+            except json.JSONDecodeError:
+                skipped += 1
+                continue
             flat_candidates.append(_transform_candidate(raw))
             _raw_nested[raw["candidate_id"]] = raw
+
+    if skipped:
+        print(f"[data.py] WARNING: skipped {skipped} malformed JSON line(s)")
 
     if len(flat_candidates) > MAX_CANDIDATES:
         random.shuffle(flat_candidates)
